@@ -1,45 +1,16 @@
 import json
 from .models import *
 
-# def cookieCart(request):
-#     # Create empty cart for now for non-logged in user
-#     try:
-#         cart = json.loads(request.COOKIES['cart'])
-#     except:
-#         cart = {}
-#         print('CART:', cart)
-#
-#     items = []
-#     order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-#     cartItems = order['get_cart_items']
-#
-#     for i in cart:
-#         # We use try block to prevent items in cart that may have been removed from causing error
-#         try:
-#             cartItems += cart[i]['quantity']
-#
-#             product = Product.objects.get(id=i)
-#             total = (product.price * cart[i]['quantity'])
-#
-#             order['get_cart_total'] += total
-#             order['get_cart_items'] += cart[i]['quantity']
-#
-#             item = {
-#                 'id': product.id,
-#                 'product': {'id': product.id, 'name': product.name, 'price': product.price,
-#                             'imageURL': product.imageURL}, 'quantity': cart[i]['quantity'],
-#                 'digital': product.digital, 'get_total': total,
-#             }
-#             items.append(item)
-#
-#             if product.digital == False:
-#                 order['shipping'] = True
-#         except:
-#             pass
-#
-#     return {'cartItems': cartItems, 'order': order, 'items': items}
+
 import json
 from django.core.exceptions import ObjectDoesNotExist
+
+# store/utils.py
+
+import json
+from decimal import Decimal # <--- ¡IMPORTA DECIMAL!
+from .models import Product # <--- Asegúrate de que Product esté importado
+from django.core.exceptions import ObjectDoesNotExist # <--- Asegúrate de que ObjectDoesNotExist esté importado
 
 def cookieCart(request):
     try:
@@ -48,15 +19,23 @@ def cookieCart(request):
         cart = {}
 
     items = []
-    order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-    cartItems = 0  # Inicializar contador de items
+    # Inicializa get_cart_total como un objeto Decimal
+    order = {'get_cart_total': Decimal('0.00'), 'get_cart_items': 0, 'shipping': False}
+    cartItems = 0
 
     for product_id, product_data in cart.items():
         try:
             quantity = product_data.get('quantity', 0)
+            # Asegúrate de que quantity sea un entero
+            quantity = int(quantity)
+
             product = Product.objects.get(id=product_id)
 
-            total = product.price * quantity
+            # Convierte product.price a Decimal si no lo es (ya debería serlo si es DecimalField)
+            # y realiza la multiplicación. El resultado será un Decimal.
+            total = product.price * Decimal(quantity) # Multiplica Decimal por Decimal o int
+
+            # Suma el total (que es un Decimal) al get_cart_total (que también es un Decimal)
             order['get_cart_total'] += total
             order['get_cart_items'] += quantity
             cartItems += quantity
@@ -66,23 +45,66 @@ def cookieCart(request):
                 'product': {
                     'id': product.id,
                     'name': product.name,
-                    'price': product.price,
+                    'price': product.price, # Esto es un Decimal
                     'imageURL': product.imageURL,
                 },
                 'quantity': quantity,
                 'digital': product.digital,
-                'get_total': total,
+                'get_total': total, # Esto también es un Decimal
             }
             items.append(item)
 
             if not product.digital:
                 order['shipping'] = True
 
-        except (ObjectDoesNotExist, ValueError):
-            # El producto no existe o cantidad inválida: ignorar este item
+        except (ObjectDoesNotExist, ValueError) as e: # Captura también ValueError para int(quantity)
+            print(f"Error processing item in cookieCart: {e}") # Para depuración
             continue
 
     return {'cartItems': cartItems, 'order': order, 'items': items}
+
+# def cookieCart(request):
+#     try:
+#         cart = json.loads(request.COOKIES.get('cart', '{}'))
+#     except json.JSONDecodeError:
+#         cart = {}
+#
+#     items = []
+#     order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
+#     cartItems = 0  # Inicializar contador de items
+#
+#     for product_id, product_data in cart.items():
+#         try:
+#             quantity = product_data.get('quantity', 0)
+#             product = Product.objects.get(id=product_id)
+#
+#             total = product.price * quantity
+#             order['get_cart_total'] += total
+#             order['get_cart_items'] += quantity
+#             cartItems += quantity
+#
+#             item = {
+#                 'id': product.id,
+#                 'product': {
+#                     'id': product.id,
+#                     'name': product.name,
+#                     'price': product.price,
+#                     'imageURL': product.imageURL,
+#                 },
+#                 'quantity': quantity,
+#                 'digital': product.digital,
+#                 'get_total': total,
+#             }
+#             items.append(item)
+#
+#             if not product.digital:
+#                 order['shipping'] = True
+#
+#         except (ObjectDoesNotExist, ValueError):
+#             # El producto no existe o cantidad inválida: ignorar este item
+#             continue
+#
+#     return {'cartItems': cartItems, 'order': order, 'items': items}
 
 # store/utils.py
 

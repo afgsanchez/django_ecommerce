@@ -1,20 +1,23 @@
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
 import json
 import datetime
+import uuid
 from django import forms
-
 from django.urls import reverse_lazy
-
-from .forms import UserCreationFormWithEmail
-
-from django.views.generic import CreateView
-
-from .models import *
-from .utils import cookieCart, cartData
-from django.contrib.auth import login
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse, FileResponse, HttpResponseForbidden
+from django.db import transaction
+from django.contrib.auth.decorators import login_required
+from wsgiref.util import FileWrapper
+from decimal import Decimal
 from .forms import CustomUserCreationForm
-from .models import Customer
+from .models import Customer, Product, Order, OrderItem, ShippingAddress
+from .utils import cookieCart, cartData, guestOrder # <--- ¡Asegúrate de importar guestOrder aquí!
+from django.contrib.auth import login
+
+# -----------------------------------------------------------------------
+# VISTAS GENERALES DE LA TIENDA
+# -----------------------------------------------------------------------
 
 def store(request):
     data = cartData(request)
@@ -75,7 +78,44 @@ def updateItem(request):
 
     return JsonResponse('Item was added', safe=False)
 
+# -----------------------------------------------------------------------
+# VISTAS DE AUTENTICACIÓN Y REGISTRO
+# -----------------------------------------------------------------------
 
+def signup(request):
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+
+            Customer.objects.create(
+                user=user,
+                name=user.username,
+                email=user.email,
+            )
+
+            login(request, user)
+            return redirect('store')
+    else:
+        form = CustomUserCreationForm()
+
+    form.fields['username'].widget = forms.TextInput(
+        attrs={'class': 'form-control mb-2', 'placeholder': 'Nombre de usuario'})
+    form.fields['email'].widget = forms.EmailInput(
+        attrs={'class': 'form-control mb-2', 'placeholder': 'Dirección email'})
+    form.fields['password1'].widget = forms.PasswordInput(
+        attrs={'class': 'form-control mb-2', 'placeholder': 'Contraseña'})
+    form.fields['password2'].widget = forms.PasswordInput(
+        attrs={'class': 'form-control mb-2', 'placeholder': 'Repita la contraseña'})
+
+    return render(request, 'registration/signup.html', {'form': form})
+
+
+# -----------------------------------------------------------------------
+# VISTAS DE PROCESAMIENTO DE PEDIDO Y DESCARGAS DIGITALES
+# -----------------------------------------------------------------------
+
+@csrf_exempt
 def processOrder(request):
     transaction_id = datetime.datetime.now().timestamp()
     data = json.loads(request.body)
@@ -83,44 +123,37 @@ def processOrder(request):
     if request.user.is_authenticated:
         customer = request.user.customer
         order, created = Order.objects.get_or_create(customer=customer, complete=False)
-
     else:
-        print('User is not logged in')
+        customer, order = guestOrder(request, data)
 
-        print('COOKIES:', request.COOKIES)
-        name = data['form']['name']
-        email = data['form']['email']
+    # --- CAMBIO AQUÍ: Convertir el total del formulario a Decimal ---
+    # Es crucial que compares Decimal con Decimal
+    try:
+        total = Decimal(data['form']['total']) # Convierte a Decimal
+    except (TypeError, ValueError):
+        # Maneja el caso en que el total no es un número válido
+        return JsonResponse({'error': 'Invalid total amount'}, status=400)
 
-        cookieData = cookieCart(request)
-        items = cookieData['items']
-
-        customer, created = Customer.objects.get_or_create(
-            email=email,
-        )
-        customer.name = name
-        customer.save()
-
-        order = Order.objects.create(
-            customer=customer,
-            complete=False,
-        )
-
-        for item in items:
-            product = Product.objects.get(id=item['id'])
-            orderItem = OrderItem.objects.create(
-                product=product,
-                order=order,
-                quantity=item['quantity'],
-            )
-
-    total = float(data['form']['total'])
     order.transaction_id = transaction_id
 
-    if total == order.get_cart_total:
+    # --- CAMBIO AQUÍ: Comparación de Decimales ---
+    # Puedes usar una pequeña tolerancia si es estrictamente necesario,
+    # pero si ambos son Decimales, la igualdad debería funcionar.
+    # Una forma segura es redondear ambos a 2 decimales para la comparación.
+    if total.quantize(Decimal('0.01')) == order.get_cart_total.quantize(Decimal('0.01')):
         order.complete = True
-    order.save()
+    else:
+        # Esto es importante para depurar si la comparación falla
+        print(f"DEBUG: Comparison failed - Form Total: {total} (Type: {type(total)}) vs Cart Total: {order.get_cart_total} (Type: {type(order.get_cart_total)})")
+        print(f"DEBUG: Difference: {total - order.get_cart_total}")
+        # Si la comparación falla, quizás quieras registrarlo o marcar la orden para revisión
+        # order.complete = False # o mantenerlo como False si no se marcó antes
+        # Puedes añadir un manejo de errores más sofisticado aquí
+        pass # La orden permanecerá como complete=False si la comparación falla
 
-    if order.shipping == True:
+    order.save() # Guarda la orden con el estado 'complete' actualizado
+
+    if order.shipping == True: # Ojo: order.shipping es un @property. Se evaluará al momento.
         ShippingAddress.objects.create(
             customer=customer,
             order=order,
@@ -130,54 +163,93 @@ def processOrder(request):
             zipcode=data['shipping']['zipcode'],
         )
 
-    return JsonResponse('Payment submitted..', safe=False)
+    with transaction.atomic():
+        for item in order.orderitem_set.all():
+            if item.product.has_digital_file:
+                if not item.download_token: # Solo crea token si no existe
+                    item.download_token = uuid.uuid4()
+                    item.save()
 
-# def signup(request):
-#     if request.method == 'POST':
-#         form = CustomUserCreationForm(request.POST)
-#         if form.is_valid():
-#             user = form.save()
-#             login(request, user) # Opcional: loguear al usuario automáticamente después del registro
-#             return redirect('store') # Redirige a la página principal de la tienda
-#     else:
-#         form = CustomUserCreationForm()
-#     return render(request, 'registration/signup.html', {'form': form})
+    return JsonResponse({'message': 'Order processed', 'order_id': order.id}, safe=False)
 
-##Funcional
-# def signup(request):
-#     if request.method == 'POST':
-#         form = CustomUserCreationForm(request.POST)
-#         if form.is_valid():
-#             user = form.save()
+# @csrf_exempt
+# def processOrder(request):
+#     transaction_id = datetime.datetime.now().timestamp()
+#     data = json.loads(request.body)
 #
-#             # Create the Customer object associated with the new User
-#             Customer.objects.create(
-#                 user=user,
-#                 name=user.username,  # Or user.first_name, if you have it
-#                 email=user.email,
-#             )
-#
-#             login(request, user)
-#             return redirect('store')  # Redirect to the store or wherever you want
+#     if request.user.is_authenticated:
+#         customer = request.user.customer
+#         order, created = Order.objects.get_or_create(customer=customer, complete=False)
 #     else:
-#         form = CustomUserCreationForm()
-#     return render(request, 'registration/signup.html', {'form': form})
-class SignUpView(CreateView):
-    form_class = UserCreationFormWithEmail
-    template_name = 'registration/signup.html'
+#         # <--- CAMBIO AQUÍ: Llamando a guestOrder de utils.py
+#         customer, order = guestOrder(request, data)
+#         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+#     total = float(data['form']['total'])
+#     order.transaction_id = transaction_id
+#
+#     if total == order.get_cart_total:
+#         order.complete = True
+#     order.save()
+#
+#     if order.shipping == True:
+#         ShippingAddress.objects.create(
+#             customer=customer,
+#             order=order,
+#             address=data['shipping']['address'],
+#             city=data['shipping']['city'],
+#             state=data['shipping']['state'],
+#             zipcode=data['shipping']['zipcode'],
+#         )
+#
+#     with transaction.atomic():
+#         for item in order.orderitem_set.all():
+#             if item.product.has_digital_file:
+#                 if not item.download_token:
+#                     item.download_token = uuid.uuid4()
+#                     item.save()
+#
+#     return JsonResponse({'message': 'Order processed', 'order_id': order.id}, safe=False)
 
-    def get_success_url(self):
-        return reverse_lazy('login') + '?register'
 
-    def get_form(self, form_class=None):
-        form = super(SignUpView, self).get_form()
-        # Modificamos en tiempo real el formulario
-        form.fields['username'].widget = forms.TextInput(
-            attrs={'class': 'form-control mb-2', 'placeholder': 'Nombre de usuario'})
-        form.fields['email'].widget = forms.EmailInput(
-            attrs={'class': 'form-control mb-2', 'placeholder': 'Dirección email'})
-        form.fields['password1'].widget = forms.PasswordInput(
-            attrs={'class': 'form-control mb-2', 'placeholder': 'Contraseña'})
-        form.fields['password2'].widget = forms.PasswordInput(
-            attrs={'class': 'form-control mb-2', 'placeholder': 'Repita la contraseña'})
-        return form
+@login_required
+def order_complete(request, order_id):
+    customer = request.user.customer
+    order = get_object_or_404(Order, id=order_id, customer=customer, complete=True)
+
+    digital_order_items = []
+    for item in order.orderitem_set.all():
+        if item.product.has_digital_file:
+            digital_order_items.append(item)
+
+    context = {
+        'order': order,
+        'digital_order_items': digital_order_items,
+    }
+    return render(request, 'store/order_complete.html', context)
+
+
+@login_required
+def download_file(request, token):
+    order_item = get_object_or_404(OrderItem, download_token=token)
+
+    if request.user.customer != order_item.order.customer:
+        return HttpResponseForbidden("No tienes permiso para descargar este archivo.")
+
+    if not order_item.product.has_digital_file or not order_item.order.complete:
+        return HttpResponseForbidden("Archivo no disponible o pedido incompleto.")
+
+    file_path = order_item.product.digital_file.path
+    file_name = order_item.product.digital_file.name.split('/')[-1]
+
+    try:
+        wrapper = FileWrapper(open(file_path, 'rb'))
+        response = FileResponse(wrapper, content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+        response['Content-Length'] = order_item.product.digital_file.size
+
+        return response
+    except FileNotFoundError:
+        return JsonResponse({'error': 'File not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Error serving file: {e}'}, status=500)

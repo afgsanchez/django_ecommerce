@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 import uuid # ¡Importa uuid para generar tokens únicos!
+from decimal import Decimal
 
 # Create your models here.
 class Customer(models.Model):
@@ -16,7 +17,7 @@ class Product(models.Model):
     # Recomendación: Usar DecimalField para precios para evitar problemas de precisión con floats
     price = models.DecimalField(max_digits=10, decimal_places=2) # Cambiado de FloatField a DecimalField
     digital = models.BooleanField(default=False, null=True, blank=True)
-    image = models.ImageField(null=True, blank=True)
+    image = models.ImageField(null=True, blank=True, upload_to='product_images/')
     digital_file = models.FileField(upload_to='digital_products/', null=True, blank=True) # Campo para el archivo descargable
 
     def __str__(self):
@@ -35,6 +36,7 @@ class Product(models.Model):
     def has_digital_file(self):
         return self.digital and bool(self.digital_file) # Usar bool() para verificar que el FileField no está vacío
 
+
 class Order(models.Model):
     customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.SET_NULL)
     date_ordered = models.DateTimeField(auto_now_add=True)
@@ -43,7 +45,6 @@ class Order(models.Model):
 
     def __str__(self):
         return str(self.id)
-
 
     @property
     def shipping(self):
@@ -59,16 +60,50 @@ class Order(models.Model):
     @property
     def get_cart_total(self):
         orderitems = self.orderitem_set.all()
+        # Aquí, si item.get_total ya devuelve un Decimal, la suma también será un Decimal.
+        # No necesitas ninguna conversión o comprobación de tipo adicional aquí.
         total = sum([item.get_total for item in orderitems])
-        # Asegurarse de que el total se devuelve como un Decimal, si price es DecimalField
-        return total if isinstance(total, models.DecimalField) else models.DecimalField(str(total), max_digits=10, decimal_places=2)
-
+        return total
 
     @property
     def get_cart_items(self):
         orderitems = self.orderitem_set.all()
         total = sum([item.quantity for item in orderitems])
         return total
+# class Order(models.Model):
+#     customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.SET_NULL)
+#     date_ordered = models.DateTimeField(auto_now_add=True)
+#     complete = models.BooleanField(default=False)
+#     transaction_id = models.CharField(max_length=100, null=True)
+#
+#     def __str__(self):
+#         return str(self.id)
+#
+#
+#     @property
+#     def shipping(self):
+#         shipping = False
+#         orderitems = self.orderitem_set.all()
+#         for i in orderitems:
+#             # Si ALGÚN producto en el pedido NO es digital, se necesita envío
+#             if not i.product.digital:
+#                 shipping = True
+#                 break # Una vez que encontramos uno que requiere envío, podemos parar
+#         return shipping
+#
+#     @property
+#     def get_cart_total(self):
+#         orderitems = self.orderitem_set.all()
+#         total = sum([item.get_total for item in orderitems])
+#         # Asegurarse de que el total se devuelve como un Decimal, si price es DecimalField
+#         return total if isinstance(total, models.DecimalField) else models.DecimalField(str(total), max_digits=10, decimal_places=2)
+#
+#
+#     @property
+#     def get_cart_items(self):
+#         orderitems = self.orderitem_set.all()
+#         total = sum([item.quantity for item in orderitems])
+#         return total
 
 class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)

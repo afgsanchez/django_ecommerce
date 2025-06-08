@@ -1,0 +1,48 @@
+{% extends 'store/main.html' %}
+{% load static %}
+
+{% block title %}Pedido Completado{% endblock title %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="box-element text-center">
+                <img src="{% static 'images/check.png' %}" alt="Checkmark" style="width: 80px; height: 80px; margin-bottom: 20px;">
+                <h2>¡Gracias por tu compra!</h2>
+                <p>Tu pedido #{{ order.id }} ha sido procesado exitosamente.</p>
+                <hr>
+
+                {% if digital_order_items %}
+                    <h4>Tus Descargas Digitales:</h4>
+                    <ul class="list-group mb-4">
+                        {% for item in digital_order_items %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ item.product.name }}
+                                <a href="{% url 'download_file' item.download_token %}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-download"></i> Descargar
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <small class="text-muted">Los enlaces de descarga son únicos para tu compra. Por favor, no los compartas.</small>
+                    <hr>
+                {% endif %}
+
+                <h4>Resumen del Pedido:</h4>
+                <p>Total de artículos: {{ order.get_cart_items }}</p>
+                <p>Total a pagar: € {{ order.get_cart_total|floatformat:2 }}</p>
+
+                {% if order.shipping %}
+                    <p>La información de envío ha sido registrada y tu pedido será enviado pronto.</p>
+                {% endif %}
+
+                <a href="{% url 'store' %}" class="btn btn-outline-primary mt-3">&#x2190; Volver a la tienda</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" crossorigin="anonymous" />
+
+{% endblock content %}

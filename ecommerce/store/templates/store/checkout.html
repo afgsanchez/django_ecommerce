@@ -194,9 +194,18 @@
 				cart = {}
 				document.cookie ='cart=' + JSON.stringify(cart) + ";domain=;path=/"
 
-				window.location.href = "{% url 'store' %}"
+				// --- CAMBIO AQUÍ: Redirigir a la página de confirmación de pedido ---
+              if (data.order_id) {
+                  window.location.href = "{% url 'order_complete' 0 %}".replace('0', data.order_id);
+              } else {
+                  // Fallback si por alguna razón no obtenemos el order_id
+                  window.location.href = "{% url 'store' %}";
+              }
+              // -----------------------------------------------------------------
 
-				})
+			})
+
+
 	    }
 	</script>
 
