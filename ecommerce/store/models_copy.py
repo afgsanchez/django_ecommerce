@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth.models import User
-import uuid # ¡Importa uuid para generar tokens únicos!
 
 # Create your models here.
 class Customer(models.Model):
@@ -9,15 +8,14 @@ class Customer(models.Model):
     email = models.EmailField(max_length=200, unique=True)
 
     def __str__(self):
-        return self.name if self.name else 'Cliente Anónimo' # Mejorar representación si name es None
+        return self.name
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    # Recomendación: Usar DecimalField para precios para evitar problemas de precisión con floats
-    price = models.DecimalField(max_digits=10, decimal_places=2) # Cambiado de FloatField a DecimalField
+    price = models.FloatField()
     digital = models.BooleanField(default=False, null=True, blank=True)
     image = models.ImageField(null=True, blank=True)
-    digital_file = models.FileField(upload_to='digital_products/', null=True, blank=True) # Campo para el archivo descargable
+    digital_file = models.FileField(upload_to='digital_products/', null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -26,14 +24,14 @@ class Product(models.Model):
     def imageURL(self):
         try:
             url = self.image.url
-        except ValueError: # Capturar ValueError si no hay archivo (en vez de un 'except' genérico)
+        except:
             url = ''
         return url
 
-    # Propiedad para verificar si el producto es digital y tiene un archivo asociado
+        # Propiedad para verificar si el producto tiene un archivo digital para descargar
     @property
     def has_digital_file(self):
-        return self.digital and bool(self.digital_file) # Usar bool() para verificar que el FileField no está vacío
+        return self.digital and self.digital_file
 
 class Order(models.Model):
     customer = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.SET_NULL)
@@ -50,19 +48,15 @@ class Order(models.Model):
         shipping = False
         orderitems = self.orderitem_set.all()
         for i in orderitems:
-            # Si ALGÚN producto en el pedido NO es digital, se necesita envío
-            if not i.product.digital:
+            if i.product.digital == False:
                 shipping = True
-                break # Una vez que encontramos uno que requiere envío, podemos parar
         return shipping
 
     @property
     def get_cart_total(self):
         orderitems = self.orderitem_set.all()
         total = sum([item.get_total for item in orderitems])
-        # Asegurarse de que el total se devuelve como un Decimal, si price es DecimalField
-        return total if isinstance(total, models.DecimalField) else models.DecimalField(str(total), max_digits=10, decimal_places=2)
-
+        return total
 
     @property
     def get_cart_items(self):
@@ -75,11 +69,6 @@ class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True)
     quantity = models.IntegerField(default=0, null=True, blank=True)
     date_added = models.DateTimeField(auto_now_add=True)
-    # --- ¡AÑADIDO ESTO! Campo para el token de descarga ---
-    download_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, null=True, blank=True)
-    # Considera añadir campos para control de descargas, por ejemplo:
-    # download_count = models.IntegerField(default=0) # Cuántas veces se ha descargado
-    # last_download_date = models.DateTimeField(null=True, blank=True) # Última fecha de descarga
 
     @property
     def get_total(self):
@@ -93,7 +82,7 @@ class OrderItem(models.Model):
     requires_shipping.short_description = 'Requires Shipping'
 
     def __str__(self):
-        return f"{self.product.name} x {self.quantity} (Order: {self.order.id})" # Mejorado para claridad
+        return f"{self.product.name} x {self.quantity}"
 
 class ShippingAddress(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True)
