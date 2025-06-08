@@ -1,10 +1,20 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse
 import json
 import datetime
+from django import forms
+
+from django.urls import reverse_lazy
+
+from .forms import UserCreationFormWithEmail
+
+from django.views.generic import CreateView
+
 from .models import *
 from .utils import cookieCart, cartData
-
+from django.contrib.auth import login
+from .forms import CustomUserCreationForm
+from .models import Customer
 
 def store(request):
     data = cartData(request)
@@ -121,3 +131,53 @@ def processOrder(request):
         )
 
     return JsonResponse('Payment submitted..', safe=False)
+
+# def signup(request):
+#     if request.method == 'POST':
+#         form = CustomUserCreationForm(request.POST)
+#         if form.is_valid():
+#             user = form.save()
+#             login(request, user) # Opcional: loguear al usuario automáticamente después del registro
+#             return redirect('store') # Redirige a la página principal de la tienda
+#     else:
+#         form = CustomUserCreationForm()
+#     return render(request, 'registration/signup.html', {'form': form})
+
+##Funcional
+# def signup(request):
+#     if request.method == 'POST':
+#         form = CustomUserCreationForm(request.POST)
+#         if form.is_valid():
+#             user = form.save()
+#
+#             # Create the Customer object associated with the new User
+#             Customer.objects.create(
+#                 user=user,
+#                 name=user.username,  # Or user.first_name, if you have it
+#                 email=user.email,
+#             )
+#
+#             login(request, user)
+#             return redirect('store')  # Redirect to the store or wherever you want
+#     else:
+#         form = CustomUserCreationForm()
+#     return render(request, 'registration/signup.html', {'form': form})
+class SignUpView(CreateView):
+    form_class = UserCreationFormWithEmail
+    template_name = 'registration/signup.html'
+
+    def get_success_url(self):
+        return reverse_lazy('login') + '?register'
+
+    def get_form(self, form_class=None):
+        form = super(SignUpView, self).get_form()
+        # Modificamos en tiempo real el formulario
+        form.fields['username'].widget = forms.TextInput(
+            attrs={'class': 'form-control mb-2', 'placeholder': 'Nombre de usuario'})
+        form.fields['email'].widget = forms.EmailInput(
+            attrs={'class': 'form-control mb-2', 'placeholder': 'Dirección email'})
+        form.fields['password1'].widget = forms.PasswordInput(
+            attrs={'class': 'form-control mb-2', 'placeholder': 'Contraseña'})
+        form.fields['password2'].widget = forms.PasswordInput(
+            attrs={'class': 'form-control mb-2', 'placeholder': 'Repita la contraseña'})
+        return form

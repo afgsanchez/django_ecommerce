@@ -131,3 +131,12 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'static/images')
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
+LOGIN_REDIRECT_URL = '/'  # O a donde quieras redirigir después del login (ej. '/store/')
+LOGOUT_REDIRECT_URL = '/' # O a donde quieras redirigir después del logout (ej. '/store/')
+
+# Opcional: si necesitas que el login requiera HTTPS
+# SECURE_SSL_REDIRECT = True
+# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

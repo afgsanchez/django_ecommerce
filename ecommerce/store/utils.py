@@ -1,57 +1,154 @@
 import json
 from .models import *
 
+# def cookieCart(request):
+#     # Create empty cart for now for non-logged in user
+#     try:
+#         cart = json.loads(request.COOKIES['cart'])
+#     except:
+#         cart = {}
+#         print('CART:', cart)
+#
+#     items = []
+#     order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
+#     cartItems = order['get_cart_items']
+#
+#     for i in cart:
+#         # We use try block to prevent items in cart that may have been removed from causing error
+#         try:
+#             cartItems += cart[i]['quantity']
+#
+#             product = Product.objects.get(id=i)
+#             total = (product.price * cart[i]['quantity'])
+#
+#             order['get_cart_total'] += total
+#             order['get_cart_items'] += cart[i]['quantity']
+#
+#             item = {
+#                 'id': product.id,
+#                 'product': {'id': product.id, 'name': product.name, 'price': product.price,
+#                             'imageURL': product.imageURL}, 'quantity': cart[i]['quantity'],
+#                 'digital': product.digital, 'get_total': total,
+#             }
+#             items.append(item)
+#
+#             if product.digital == False:
+#                 order['shipping'] = True
+#         except:
+#             pass
+#
+#     return {'cartItems': cartItems, 'order': order, 'items': items}
+import json
+from django.core.exceptions import ObjectDoesNotExist
+
 def cookieCart(request):
-    # Create empty cart for now for non-logged in user
     try:
-        cart = json.loads(request.COOKIES['cart'])
-    except:
+        cart = json.loads(request.COOKIES.get('cart', '{}'))
+    except json.JSONDecodeError:
         cart = {}
-        print('CART:', cart)
 
     items = []
     order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-    cartItems = order['get_cart_items']
+    cartItems = 0  # Inicializar contador de items
 
-    for i in cart:
-        # We use try block to prevent items in cart that may have been removed from causing error
+    for product_id, product_data in cart.items():
         try:
-            cartItems += cart[i]['quantity']
+            quantity = product_data.get('quantity', 0)
+            product = Product.objects.get(id=product_id)
 
-            product = Product.objects.get(id=i)
-            total = (product.price * cart[i]['quantity'])
-
+            total = product.price * quantity
             order['get_cart_total'] += total
-            order['get_cart_items'] += cart[i]['quantity']
+            order['get_cart_items'] += quantity
+            cartItems += quantity
 
             item = {
                 'id': product.id,
-                'product': {'id': product.id, 'name': product.name, 'price': product.price,
-                            'imageURL': product.imageURL}, 'quantity': cart[i]['quantity'],
-                'digital': product.digital, 'get_total': total,
+                'product': {
+                    'id': product.id,
+                    'name': product.name,
+                    'price': product.price,
+                    'imageURL': product.imageURL,
+                },
+                'quantity': quantity,
+                'digital': product.digital,
+                'get_total': total,
             }
             items.append(item)
 
-            if product.digital == False:
+            if not product.digital:
                 order['shipping'] = True
-        except:
-            pass
+
+        except (ObjectDoesNotExist, ValueError):
+            # El producto no existe o cantidad inválida: ignorar este item
+            continue
 
     return {'cartItems': cartItems, 'order': order, 'items': items}
 
+# store/utils.py
+
+# Asegúrate de que todas tus importaciones necesarias están aquí arriba
+# Por ejemplo:
+# from .models import Customer, Product, Order, OrderItem
+# from .utils import cookieCart # Si cookieCart está en otro archivo, aunque generalmente está en el mismo utils.py
+
 def cartData(request):
     if request.user.is_authenticated:
-        customer = request.user.customer
+        # Lógica para usuarios autenticados
+        try:
+            # Intenta obtener el objeto Customer asociado al usuario
+            customer = request.user.customer
+        except Customer.DoesNotExist:
+            # Si el Customer no existe para este usuario (por ejemplo, es un usuario antiguo o un superusuario
+            # que se creó antes de implementar la lógica de Customer en el registro),
+            # lo creamos en este momento.
+            customer = Customer.objects.create(
+                user=request.user,
+                name=request.user.username, # Puedes ajustar esto si tienes un campo 'first_name' en tu User
+                email=request.user.email,
+            )
+            # No es estrictamente necesario llamar a .save() después de .create() ya que create() lo hace.
+            # Pero tampoco hace daño si lo pones.
+
+        # A partir de aquí, el objeto 'customer' está garantizado para existir
+        # y el resto de tu lógica para usuarios autenticados puede continuar.
+
+        # Buscar el primer pedido incompleto, si no existe, crearlo
+        # Simplificado: get_or_create es más idiomático aquí
         order, created = Order.objects.get_or_create(customer=customer, complete=False)
+
+
         items = order.orderitem_set.all()
         cartItems = order.get_cart_items
     else:
-        # Create empty cart for now for non-logged in user
+        # Carrito para usuario no autenticado (desde cookies)
         cookieData = cookieCart(request)
         cartItems = cookieData['cartItems']
         order = cookieData['order']
         items = cookieData['items']
-    return {'cartItems':cartItems, 'order':order, 'items':items}
+
+    return {'cartItems': cartItems, 'order': order, 'items': items}
+
+
+# def cartData(request):
+#     if request.user.is_authenticated:
+#         customer = request.user.customer
+#
+#         # Buscar el primer pedido incompleto, si no existe, crearlo
+#         order = Order.objects.filter(customer=customer, complete=False).first()
+#         if order is None:
+#             order = Order.objects.create(customer=customer, complete=False)
+#
+#         items = order.orderitem_set.all()
+#         cartItems = order.get_cart_items
+#     else:
+#         # Carrito para usuario no autenticado (desde cookies)
+#         cookieData = cookieCart(request)
+#         cartItems = cookieData['cartItems']
+#         order = cookieData['order']
+#         items = cookieData['items']
+#
+#     return {'cartItems': cartItems, 'order': order, 'items': items}
+
 
 def guestOrder(request, data):
     name = data['form']['name']
@@ -60,22 +157,22 @@ def guestOrder(request, data):
     cookieData = cookieCart(request)
     items = cookieData['items']
 
-    customer, created = Customer.objects.get_or_create(
-            email=email,
-            )
-    customer.name = name
-    customer.save()
+    customer, created = Customer.objects.get_or_create(email=email)
 
-    order = Order.objects.create(
-        customer=customer,
-        complete=False,
-        )
+    # ✅ Solo guardar el nombre si está vacío
+    if not customer.name:
+        customer.name = name
+        customer.save()
+
+    order = Order.objects.create(customer=customer, complete=False)
 
     for item in items:
         product = Product.objects.get(id=item['id'])
-        orderItem = OrderItem.objects.create(
+        OrderItem.objects.create(
             product=product,
             order=order,
             quantity=item['quantity'],
         )
+
     return customer, order
+

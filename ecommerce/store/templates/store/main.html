@@ -12,6 +12,7 @@
 
 
 	<link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" crossorigin="anonymous" />
 
 
 	<script type="text/javascript">
@@ -76,23 +77,36 @@
 	  <div class="collapse navbar-collapse" id="navbarSupportedContent">
 	    <ul class="navbar-nav mr-auto">
 	      <li class="nav-item active">
-	        <a class="nav-link" href="{% url 'store' %}">Store <span class="sr-only">(current)</span></a>
+	        <a class="nav-link" href="{% url 'store' %}">Home <span class="sr-only">(current)</span></a>
 
 	      </li>
 
 	    </ul>
-	    <div class="form-inline my-2 my-lg-0">
+			<div class="form-inline my-2 my-lg-0">
 
-<!--			<a class="nav-link">Usuario: {{user}} <span class="sr-only">(current)</span></a>-->
+				{% if not user.is_authenticated %}
+					{# El botón de Login solo si el usuario NO está autenticado #}
+					<a href="{% url 'login' %}" class="btn btn-warning">Login</a>
+				{% else %}
+					{# El saludo y el el botón de Logout si el usuario está autenticado #}
+					<span class="navbar-text mr-3">
+					  <i class="fas fa-user-circle"></i> ¡Hola, {{ user.username }}!
+					</span>
 
-	     	<a href="#"class="btn btn-warning">Login</a>
+					{# Cambia este enlace a un formulario de POST para el logout #}
+					<form action="{% url 'logout' %}" method="post" style="display: inline;">
+						{% csrf_token %}
+						<button type="submit" class="btn btn-danger mr-3">Cerrar Sesión</button>
+					</form>
 
-	     	<a href="{% url 'cart' %}">
-	    		<img  id="cart-icon" src="{% static 'images/cart.png' %}">
-	    	</a>
-	    	<p id="cart-total">{{cartItems}}</p>
+					<a href="{% url 'cart' %}">
+					   <img  id="cart-icon" src="{% static 'images/cart.png' %}">
+					</a>
+					<p id="cart-total">{{cartItems}}</p>
 
-	    </div>
+				{% endif %}
+
+			</div>
 	  </div>
 	</nav>
 
