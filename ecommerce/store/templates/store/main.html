@@ -99,12 +99,12 @@
 						<button type="submit" class="btn btn-danger mr-3">Cerrar Sesión</button>
 					</form>
 
+				{% endif %}
+
 					<a href="{% url 'cart' %}">
 					   <img  id="cart-icon" src="{% static 'images/cart.png' %}">
 					</a>
 					<p id="cart-total">{{cartItems}}</p>
-
-				{% endif %}
 
 			</div>
 	  </div>
