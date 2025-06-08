@@ -172,45 +172,6 @@ def processOrder(request):
 
     return JsonResponse({'message': 'Order processed', 'order_id': order.id}, safe=False)
 
-# @csrf_exempt
-# def processOrder(request):
-#     transaction_id = datetime.datetime.now().timestamp()
-#     data = json.loads(request.body)
-#
-#     if request.user.is_authenticated:
-#         customer = request.user.customer
-#         order, created = Order.objects.get_or_create(customer=customer, complete=False)
-#     else:
-#         # <--- CAMBIO AQUÍ: Llamando a guestOrder de utils.py
-#         customer, order = guestOrder(request, data)
-#         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-#
-#     total = float(data['form']['total'])
-#     order.transaction_id = transaction_id
-#
-#     if total == order.get_cart_total:
-#         order.complete = True
-#     order.save()
-#
-#     if order.shipping == True:
-#         ShippingAddress.objects.create(
-#             customer=customer,
-#             order=order,
-#             address=data['shipping']['address'],
-#             city=data['shipping']['city'],
-#             state=data['shipping']['state'],
-#             zipcode=data['shipping']['zipcode'],
-#         )
-#
-#     with transaction.atomic():
-#         for item in order.orderitem_set.all():
-#             if item.product.has_digital_file:
-#                 if not item.download_token:
-#                     item.download_token = uuid.uuid4()
-#                     item.save()
-#
-#     return JsonResponse({'message': 'Order processed', 'order_id': order.id}, safe=False)
-
 
 @login_required
 def order_complete(request, order_id):
@@ -228,6 +189,23 @@ def order_complete(request, order_id):
     }
     return render(request, 'store/order_complete.html', context)
 
+# --- NUEVA VISTA PARA IMPRIMIR PEDIDO/FACTURA ---
+@login_required
+def order_print_view(request, order_id):
+    customer = request.user.customer
+    # Asegurarse de que la orden esté completa y pertenezca al usuario
+    order = get_object_or_404(Order, id=order_id, customer=customer, complete=True)
+    order_items = order.orderitem_set.all()
+
+    current_datetime = datetime.datetime.now()
+
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'current_datetime': current_datetime,
+        # Puedes añadir más información aquí si tu "factura" lo requiere (ej. datos de la tienda)
+    }
+    return render(request, 'store/order_print.html', context) # Renderiza el nuevo template
 
 @login_required
 def download_file(request, token):

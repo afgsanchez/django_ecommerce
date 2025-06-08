@@ -37,6 +37,14 @@
                     <p>La información de envío ha sido registrada y tu pedido será enviado pronto.</p>
                 {% endif %}
 
+                <div class="row mt-4">
+                    <div class="col text-center">
+                        <a href="{% url 'order_print_view' order.id %}" target="_blank" class="btn btn-primary">
+                            <i class="fa fa-print"></i> Imprimir Pedido / Factura
+                        </a>
+                    </div>
+                </div>
+
                 <a href="{% url 'store' %}" class="btn btn-outline-primary mt-3">&#x2190; Volver a la tienda</a>
             </div>
         </div>

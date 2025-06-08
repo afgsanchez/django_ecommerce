@@ -13,4 +13,5 @@ urlpatterns = [
     # --- NUEVAS URLS PARA DESCARGAS ---
     path('order_complete/<int:order_id>/', views.order_complete, name="order_complete"),
     path('download/<uuid:token>/', views.download_file, name="download_file"),
+    path('order/<int:order_id>/print/', views.order_print_view, name='order_print_view'),
 ]
