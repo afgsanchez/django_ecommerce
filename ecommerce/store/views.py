@@ -15,6 +15,8 @@ from .forms import CustomUserCreationForm
 from .models import Customer, Product, Order, OrderItem, ShippingAddress
 from .utils import cookieCart, cartData, guestOrder # <--- ¡Asegúrate de importar guestOrder aquí!
 from django.contrib.auth import login
+import  re
+
 
 # -----------------------------------------------------------------------
 # VISTAS GENERALES DE LA TIENDA
@@ -115,23 +117,11 @@ def signup(request):
 # -----------------------------------------------------------------------
 # VISTAS DE PROCESAMIENTO DE PEDIDO Y DESCARGAS DIGITALES
 # -----------------------------------------------------------------------
-# ecommerce/store/views.py
-
-# Asegúrate de que todas tus importaciones estén presentes, incluyendo json, datetime, Decimal, uuid y transaction
-import json
-import datetime
-import uuid
-from decimal import Decimal
-from django.db import transaction
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from .models import Order, Customer, ShippingAddress # Asegúrate de que Product y OrderItem también estén importados
-from .utils import guestOrder # Asegúrate de que guestOrder esté importado
 
 @csrf_exempt
 def processOrder(request):
-    # Genera un ID de transacción basado en el timestamp.
-    # En un entorno real con PayPal, este ID debería provenir de la respuesta de PayPal.
+    # ... (código existente para procesar el pedido y obtener 'data') ...
+
     transaction_id = datetime.datetime.now().timestamp()
     data = json.loads(request.body)
 
@@ -142,117 +132,104 @@ def processOrder(request):
         customer = request.user.customer
         order, created = Order.objects.get_or_create(customer=customer, complete=False)
     else:
-        # Aquí se gestiona el pedido para usuarios no registrados.
-        # guestOrder crea o recupera un Customer basado en la sesión/dispositivo y crea la Order.
         customer, order = guestOrder(request, data)
 
-    # --- INICIO DE AJUSTES ---
-
-    # Convertir el total del formulario a Decimal para una comparación precisa.
     try:
         total = Decimal(data['form']['total'])
     except (TypeError, ValueError):
-        # Maneja el caso en que el total no es un número válido.
-        return JsonResponse({'error': 'Invalid total amount received from form'}, status=400)
+        return JsonResponse({'error': 'Total del formulario inválido'}, status=400)
 
-    # Verifica si el total del formulario coincide con el total calculado en el backend.
-    # Esta es una medida de seguridad crucial para evitar manipulaciones de precios.
-    # Usamos .quantize para evitar problemas de precisión con los decimales.
+    # --- INICIO DE LA LÓGICA DE VALIDACIÓN MEJORADA (con teléfono) ---
+
+    user_form_name = data['form'].get('name', '').strip()
+    user_form_email = data['form'].get('email', '').strip()
+
+    shipping_data = data.get('shipping', {})
+    address = shipping_data.get('address', '').strip()
+    city = shipping_data.get('city', '').strip()
+    state = shipping_data.get('state', '').strip()
+    zipcode = shipping_data.get('zipcode', '').strip()
+    phone_number = shipping_data.get('phone_number', '').strip()
+
+    # --- INICIO DE LÍNEAS DE DEPURACIÓN ---
+    print(f"DEBUG: Valor de phone_number recibido: '{phone_number}'")
+    # --- FIN DE LÍNEAS DE DEPURACIÓN ---
+
+    # 1. Validar nombre y email SIEMPRE
+    if not user_form_name:
+        return JsonResponse({'error': 'El campo "Nombre completo" es obligatorio.'}, status=400)
+    if not user_form_email:
+        return JsonResponse({'error': 'El campo "Email" es obligatorio.'}, status=400)
+
+    # 2. Validar campos de envío y teléfono SOLO SI el pedido requiere envío
+    if order.shipping:
+        required_shipping_fields = {
+            'Dirección': address,
+            'Ciudad': city,
+            'Provincia': state,
+            'Código Postal': zipcode,
+            'Número de Teléfono': phone_number, # Campo que estamos validando
+        }
+
+        for field_name, value in required_shipping_fields.items():
+            if not value:
+                return JsonResponse({'error': f'El campo "{field_name}" es obligatorio para este pedido con envío.'}, status=400)
+
+        # 3. Validar formato del número de teléfono (solo si el envío es requerido y el campo no está vacío)
+        # Regex para números de teléfono:
+        # ^         -> Inicio de la cadena
+        # \+?       -> Cero o una vez el signo '+' (para números internacionales)
+        # [\d\s-]{7,20} -> De 7 a 20 caracteres que pueden ser dígitos (\d), espacios (\s) o guiones (-)
+        # $         -> Fin de la cadena
+        #
+        # Este regex es bastante flexible para aceptar varios formatos comunes.
+        # Si necesitas ser más estricto (ej. solo 9 dígitos para España), avísame.
+        phone_regex = r'^\+?[\d\s-]{7,20}$'
+
+        # --- MÁS LÍNEAS DE DEPURACIÓN ---
+        print(f"DEBUG: Regex a usar: '{phone_regex}'")
+        print(
+            f"DEBUG: ¿Coincide el número '{phone_number}' con el regex? {bool(re.fullmatch(phone_regex, phone_number))}")
+        # --- FIN MÁS LÍNEAS DE DEPURACIÓN ---
+
+        if not re.fullmatch(phone_regex, phone_number):
+            return JsonResponse({'error': 'El "Número de Teléfono" no tiene un formato válido. Debe contener solo números, espacios o guiones, y tener una longitud razonable.'}, status=400)
+
+    # --- FIN DE LA LÓGICA DE VALIDACIÓN MEJORADA ---
+
+    # ... (resto de la lógica de comparación de precios, order.save(), ShippingAddress.create(), etc.) ...
     if total.quantize(Decimal('0.01')) == order.get_cart_total.quantize(Decimal('0.01')):
         order.complete = True
-        order.transaction_id = transaction_id # Asigna el ID de transacción solo si la compra es válida.
+        order.transaction_id = transaction_id
     else:
-        # Si los totales no coinciden, es un problema de seguridad o un error.
         print(f"DEBUG: Comparación de total fallida - Total del formulario: {total} vs Total del carrito: {order.get_cart_total}")
-        print(f"DEBUG: Diferencia: {total - order.get_cart_total}")
-        # En este caso, NO marcamos la orden como completa y devolvemos un error.
-        # Esto previene que una orden con precio manipulado se complete.
-        return JsonResponse({'error': 'Total mismatch detected. Order not processed.'}, status=400)
+        return JsonResponse({'error': 'Error de precios: El total no coincide. Pedido no procesado.'}, status=400)
 
-    order.save() # Guarda la orden con el estado 'complete' actualizado y el transaction_id.
+    order.save()
 
-    # Guardar la dirección de envío si la orden lo requiere.
-    # El @property 'order.shipping' se evaluará aquí.
-    if order.shipping: # No es necesario poner '== True', ya que es un booleano.
+    if order.shipping:
         ShippingAddress.objects.create(
             customer=customer,
             order=order,
-            address=data['shipping']['address'],
-            city=data['shipping']['city'],
-            state=data['shipping']['state'],
-            zipcode=data['shipping']['zipcode'],
+            address=address,
+            city=city,
+            state=state,
+            zipcode=zipcode,
+            phone_number=phone_number,
         )
 
-    # Gestionar productos digitales y generar tokens de descarga.
-    # transaction.atomic() asegura que si algo falla aquí, todos los cambios se revierten.
     with transaction.atomic():
         for item in order.orderitem_set.all():
-            if item.product and item.product.has_digital_file: # Asegúrate de comprobar item.product no sea None
-                if not item.download_token: # Solo crea token si no existe (normalmente ya lo tendrían por default en el modelo)
+            if item.product and item.product.has_digital_file:
+                if not item.download_token:
                     item.download_token = uuid.uuid4()
                     item.save()
 
-    # --- NUEVO: Almacenar el order_id en la sesión para el usuario invitado ---
-    # Esto es crucial para permitir que el invitado vea la página de confirmación.
     if not request.user.is_authenticated:
         request.session['guest_order_id'] = order.id
-    # --- FIN NUEVO ---
 
-    # Devuelve una respuesta JSON indicando que el pedido fue procesado.
-    # Es importante pasar el order_id para la redirección a la página de confirmación.
-    return JsonResponse({'message': 'Order processed successfully', 'order_id': order.id}, status=200)
-# @csrf_exempt
-# def processOrder(request):
-#     transaction_id = datetime.datetime.now().timestamp()
-#     data = json.loads(request.body)
-#
-#     if request.user.is_authenticated:
-#         customer = request.user.customer
-#         order, created = Order.objects.get_or_create(customer=customer, complete=False)
-#     else:
-#         customer, order = guestOrder(request, data)
-#
-#     # --- CAMBIO AQUÍ: Convertir el total del formulario a Decimal ---
-#     # Es crucial que compares Decimal con Decimal
-#     try:
-#         total = Decimal(data['form']['total']) # Convierte a Decimal
-#     except (TypeError, ValueError):
-#         # Maneja el caso en que el total no es un número válido
-#         return JsonResponse({'error': 'Invalid total amount'}, status=400)
-#
-#     order.transaction_id = transaction_id
-#
-#     if total.quantize(Decimal('0.01')) == order.get_cart_total.quantize(Decimal('0.01')):
-#         order.complete = True
-#     else:
-#         # Esto es importante para depurar si la comparación falla
-#         print(f"DEBUG: Comparison failed - Form Total: {total} (Type: {type(total)}) vs Cart Total: {order.get_cart_total} (Type: {type(order.get_cart_total)})")
-#         print(f"DEBUG: Difference: {total - order.get_cart_total}")
-#         # Si la comparación falla, quizás quieras registrarlo o marcar la orden para revisión
-#         # order.complete = False # o mantenerlo como False si no se marcó antes
-#         # Puedes añadir un manejo de errores más sofisticado aquí
-#         pass # La orden permanecerá como complete=False si la comparación falla
-#
-#     order.save() # Guarda la orden con el estado 'complete' actualizado
-#
-#     if order.shipping == True: # Ojo: order.shipping es un @property. Se evaluará al momento.
-#         ShippingAddress.objects.create(
-#             customer=customer,
-#             order=order,
-#             address=data['shipping']['address'],
-#             city=data['shipping']['city'],
-#             state=data['shipping']['state'],
-#             zipcode=data['shipping']['zipcode'],
-#         )
-#
-#     with transaction.atomic():
-#         for item in order.orderitem_set.all():
-#             if item.product.has_digital_file:
-#                 if not item.download_token: # Solo crea token si no existe
-#                     item.download_token = uuid.uuid4()
-#                     item.save()
-#
-#     return JsonResponse({'message': 'Order processed', 'order_id': order.id}, safe=False)
+    return JsonResponse({'message': 'Pedido procesado con éxito', 'order_id': order.id}, status=200)
+
 
 
 

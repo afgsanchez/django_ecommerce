@@ -8,7 +8,7 @@
                 <form id="form">
                     <div id="user-info">
                         <div class="form-field">
-							<input required class="form-control" type="text" name="name" placeholder="Name..">
+							<input required class="form-control" type="text" name="name" placeholder="Nombre y apellidos...">
 						</div>
 						<div class="form-field">
 							<input required class="form-control" type="email" name="email" placeholder="Email..">
@@ -18,19 +18,22 @@
 
                     <div id="shipping-info">
                         <hr>
-						<p>Shipping Information:</p>
+						<p>Informacion de Envío:</p>
 						<hr>
 						<div class="form-field">
-							<input class="form-control" type="text" name="address" placeholder="Address..">
+							<input class="form-control" type="text" name="phone_number" placeholder="Número de teléfono*" required>
 						</div>
 						<div class="form-field">
-							<input class="form-control" type="text" name="city" placeholder="City..">
+							<input class="form-control" type="text" name="address" placeholder="Dirección*" required>
 						</div>
 						<div class="form-field">
-							<input class="form-control" type="text" name="state" placeholder="State..">
+							<input class="form-control" type="text" name="city" placeholder="Población*" required>
 						</div>
 						<div class="form-field">
-							<input class="form-control" type="text" name="zipcode" placeholder="Zip code..">
+							<input class="form-control" type="text" name="state" placeholder="Provincia y País*" required>
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="zipcode" placeholder="Código postal.." required>
 						</div>
 
                     </div>
@@ -114,100 +117,123 @@
 
 
 	<script type="text/javascript">
-		var shipping = '{{order.shipping}}'
-		var total = '{{order.get_cart_total|floatformat:2}}'
+       var shipping = '{{order.shipping|yesno:"True,False"}}' // Usar yesno para asegurar "True" o "False" como strings
+       var total = '{{order.get_cart_total|floatformat:2}}'
 
-		if (shipping == 'False'){
-		 	document.getElementById('shipping-info').innerHTML = ''
-		}
+       // Lógica para ocultar/mostrar secciones
+       if (shipping == 'False'){
+          // Si no se requiere envío (productos digitales), vaciamos la sección de envío.
+          document.getElementById('shipping-info').innerHTML = ''
+       }
 
-		if (user != 'AnonymousUser'){
-		 	document.getElementById('user-info').innerHTML = ''
-		 }
+       // --- CAMBIO CLAVE AQUÍ ---
+       // SI EL USUARIO NO ES ANÓNIMO, NO VACIAR user-info.
+       // Queremos que los campos de nombre y email estén SIEMPRE visibles y puedan ser editados
+       // o simplemente que sus valores se recojan del formulario.
+       // ELIMINA O COMENTA ESTA LÍNEA:
+       // if (user != 'AnonymousUser'){
+       //    document.getElementById('user-info').innerHTML = ''
+       // }
+       // --- FIN CAMBIO CLAVE ---
 
-		if (shipping == 'False' && user != 'AnonymousUser'){
-			//Hide entire form if user is logged in and shipping is false
-				document.getElementById('form-wrapper').classList.add("hidden");
-				//Show payment if logged in user wants to buy an item that does not require shipping
-			    document.getElementById('payment-info').classList.remove("hidden");
-		}
 
-		var form = document.getElementById('form')
-		form.addEventListener('submit', function(e){
-	    	e.preventDefault()
-	    	console.log('Form Submitted...')
-	    	document.getElementById('form-button').classList.add("hidden");
-	    	document.getElementById('payment-info').classList.remove("hidden");
-	    })
-		/*
-	    document.getElementById('make-payment').addEventListener('click', function(e){
-	    	submitFormData()
-	    })
-		*/
+       if (shipping == 'False' && user != 'AnonymousUser'){
+          // Oculta todo el formulario si el usuario está logueado y no necesita envío
+          document.getElementById('form-wrapper').classList.add("hidden");
+          // Muestra la información de pago directamente
+          document.getElementById('payment-info').classList.remove("hidden");
+       }
 
-	    function submitFormData(){
-	    	console.log('Payment button clicked')
+       var form = document.getElementById('form')
+       form.addEventListener('submit', function(e){
+           e.preventDefault()
+           console.log('Formulario enviado...')
+           document.getElementById('form-button').classList.add("hidden");
+           document.getElementById('payment-info').classList.remove("hidden");
+        })
 
-	    	var userFormData = {
-				'name':null,
-				'email':null,
-				'total':total,
-			}
+        function submitFormData(){
+           console.log('Botón de pago clickeado')
 
-			var shippingInfo = {
-				'address':null,
-				'city':null,
-				'state':null,
-				'zipcode':null,
-			}
+           var userFormData = {
+             'name':null,
+             'email':null,
+             'total':total,
+          }
 
-			if (shipping != 'False'){
-	    		shippingInfo.address = form.address.value
-		    	shippingInfo.city = form.city.value
-		    	shippingInfo.state = form.state.value
-		    	shippingInfo.zipcode = form.zipcode.value
-	    	}
+          // --- CAMBIO CLAVE AQUÍ ---
+          // Asegúrate de que los valores de 'name' y 'email' SIEMPRE se tomen del formulario,
+          // independientemente de si el usuario está logueado o es anónimo.
+          userFormData.name = form.name.value;
+          userFormData.email = form.email.value;
+          // --- FIN CAMBIO CLAVE ---
 
-	    	if (user == 'AnonymousUser'){
-	    		userFormData.name = form.name.value
-	    		userFormData.email = form.email.value
-	    	}
 
-	    	console.log('Shipping Info:', shippingInfo)
-	    	console.log('User Info:', userFormData)
+          var shippingInfo = {
+             'address':null,
+             'city':null,
+             'state':null,
+             'zipcode':null,
+             'phone_number':null, // ¡Asegúrate de que este campo esté inicializado aquí!
+          }
 
-	    	var url = "/process_order/"
-	    	fetch(url, {
-	    		method:'POST',
-	    		headers:{
-	    			'Content-Type':'application/json',
-	    			'X-CSRFToken':csrftoken,
-	    		},
-	    		body:JSON.stringify({'form':userFormData, 'shipping':shippingInfo}),
+          if (shipping != 'False'){
+              shippingInfo.address = form.address.value;
+              shippingInfo.city = form.city.value;
+              shippingInfo.state = form.state.value;
+              shippingInfo.zipcode = form.zipcode.value;
+              // --- AÑADE ESTA LÍNEA ---
+              shippingInfo.phone_number = form.phone_number.value;
+              // --- FIN AÑADIDO ---
+           }
 
-	    	})
-	    	.then((response) => response.json())
-	    	.then((data) => {
-				console.log('Success:', data);
-				alert('Transaction completed');
+           console.log('Shipping Info:', shippingInfo)
+           console.log('User Info:', userFormData)
 
-				cart = {}
-				document.cookie ='cart=' + JSON.stringify(cart) + ";domain=;path=/"
+           var url = "/process_order/"
+           fetch(url, {
+              method:'POST',
+              headers:{
+                 'Content-Type':'application/json',
+                 'X-CSRFToken':csrftoken,
+              },
+              body:JSON.stringify({'form':userFormData, 'shipping':shippingInfo}),
 
-				// --- CAMBIO AQUÍ: Redirigir a la página de confirmación de pedido ---
+           })
+           .then((response) => {
+               // Verifica si la respuesta es OK o un error 400
+               if (!response.ok) {
+                   // Si la respuesta no es OK, lee el error del JSON y lánzalo
+                   return response.json().then(errorData => {
+                       throw new Error(errorData.error || 'Error desconocido del servidor');
+                   });
+               }
+               return response.json();
+           })
+           .then((data) => {
+             console.log('Éxito:', data);
+             alert('Transacción completada'); // Este alert se mostrará si no hay errores
+
+             cart = {}
+             document.cookie ='cart=' + JSON.stringify(cart) + ";domain=;path=/"
+
               if (data.order_id) {
                   window.location.href = "{% url 'order_complete' 0 %}".replace('0', data.order_id);
               } else {
                   // Fallback si por alguna razón no obtenemos el order_id
                   window.location.href = "{% url 'store' %}";
               }
-              // -----------------------------------------------------------------
 
-			})
-
-
-	    }
-	</script>
+          })
+          .catch((error) => {
+              console.error('Error durante el fetch:', error);
+              alert(error.message || 'Ocurrió un error inesperado. Por favor, inténtalo de nuevo.'); // Muestra el mensaje de error del backend
+              // Vuelve a hacer visibles los botones y oculta el spinner si es necesario
+              document.getElementById('form-button').classList.remove("hidden");
+              document.getElementById('payment-info').classList.add("hidden"); // Ocultar info de pago si es un error crítico
+          });
+        }
+    </script>
 
 
 {% endblock content %}
