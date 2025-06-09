@@ -37,9 +37,35 @@ class OrderAdmin(admin.ModelAdmin):
 class OrderItemAdmin(admin.ModelAdmin):
     list_display = ('product','order', 'quantity', 'date_added', 'get_total', 'requires_shipping')
 
-admin.site.register(Customer)
+class ShippingAddressInline(admin.TabularInline):
+    # Relaciona este inline con el modelo ShippingAddress
+    model = ShippingAddress
+    # Determina cuántos formularios vacíos se muestran para añadir nuevas direcciones.
+    # 0 significa que no se muestran vacíos a menos que se pulse "Añadir otro".
+    extra = 0
+    # Puedes especificar los campos que quieres mostrar y/o los que serán de solo lectura
+    # fields = ['address', 'city', 'state', 'zipcode']
+    # readonly_fields = ['order'] # Si no quieres que el pedido se modifique desde aquí
+
+class CustomerAdmin(admin.ModelAdmin):
+    # Campos que se mostrarán en la lista de clientes en el panel de administración
+    list_display = ('name', 'email')
+    # Campos por los que se puede buscar
+    search_fields = ('name', 'email')
+    # ¡Añadimos el inline aquí!
+    inlines = [ShippingAddressInline]
+
+class ShippingAddressAdmin(admin.ModelAdmin):
+    # Campos que se mostrarán en la lista de direcciones de envío
+    list_display = ('customer', 'address', 'city', 'state', 'zipcode', 'order')
+    # Campos por los que se puede buscar en la lista de direcciones
+    search_fields = ('customer__name', 'customer__email', 'address', 'city', 'zipcode')
+    # Opcional: Filtros para la lista de direcciones
+    list_filter = ('state', 'city')
+
+admin.site.register(Customer, CustomerAdmin)
 admin.site.register(Product)
 admin.site.register(Order, OrderAdmin)
 admin.site.register(OrderItem, OrderItemAdmin)
-admin.site.register(ShippingAddress)
+admin.site.register(ShippingAddress, ShippingAddressAdmin)
 
