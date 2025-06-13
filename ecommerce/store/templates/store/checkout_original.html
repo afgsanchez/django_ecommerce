@@ -1,0 +1,293 @@
+{% extends 'store/main.html' %}
+{% block title %}Checkout{% endblock title %}
+{% load static %}
+{% block content %}
+     <div class="row">
+		<div class="col-lg-6">
+			<div class="box-element" id="form-wrapper">
+                <form id="form">
+                    <div id="user-info">
+                        <div class="form-field">
+							<input required class="form-control" type="text" name="name" placeholder="Nombre y apellidos..."
+							value="{% if request.user.is_authenticated %}{{ request.user.customer.name|default_if_none:'' }}{% endif %}">
+						</div>
+						<div class="form-field">
+							<input required class="form-control" type="email" name="email" placeholder="Email.."
+							value="{% if request.user.is_authenticated %}{{ request.user.email|default_if_none:'' }}{% endif %}">
+						</div>
+
+                    </div>
+
+                    <div id="shipping-info">
+                        <hr>
+						<p>Por favor, introduzca su nombre y apellidos para el envío.!</p>
+						<p>Informacion de Envío:</p>
+						<hr>
+						<div class="form-field">
+							<input class="form-control" type="text" name="phone_number" placeholder="Número de teléfono*" required>
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="address" placeholder="Dirección*" required>
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="city" placeholder="Población*" required>
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="state" placeholder="Provincia y País*" required>
+						</div>
+						<div class="form-field">
+							<input class="form-control" type="text" name="zipcode" placeholder="Código postal.." required>
+						</div>
+
+                    </div>
+
+                    <br>
+                    <input id="form-button" class="btn btn-success btn-block" type="submit" value="Continue">
+                </form>
+
+			</div>
+            <br>
+            <div class="box-element hidden" id="payment-info">
+                <small>PayPal Options</small>
+				<div id="paypal-button-container"></div>
+            </div>
+
+		</div>
+
+		<div class="col-lg-6">
+			<div class="box-element">
+                <a class="btn btn-outline-dark" href="{% url 'cart' %}">&#x2190; Back to Cart</a>
+                <hr>
+                <h3>Order Summary</h3>
+                <hr>
+				{% for item in items %}
+					<div class="cart-row">
+						<div style="flex:2"><img class="row-image" src="{{item.product.imageURL}}"></div>
+						<div style="flex:2"><p>{{item.product.name}}</p></div>
+						<div style="flex:1"><p>€ {{item.product.price|floatformat:2}}</p></div>
+						<div style="flex:1"><p>x{{item.quantity}}</p></div>
+					</div>
+				{% endfor %}
+				<h5>Items:   {{order.get_cart_items}}</h5>
+				<h5>Total:   € {{order.get_cart_total|floatformat:2}}</h5>
+
+			</div>
+		</div>
+	</div>
+
+<!-- Include the PayPal JavaScript SDK -->
+<!--	<script src="https://www.paypal.com/sdk/js?client-id=sb&currency=EUR"></script>-->
+
+	<script src="https://www.paypal.com/sdk/js?client-id=ASWRlLR2zxBtvTy1_AY7pOkUg2KxrL21CpJh7-vHLZf2aWcX3WgZ8QkxkoOA7X380ARHS2Cuyra1cM6m&currency=EUR"></script>
+
+	<script>
+		var total = '{{order.get_cart_total}}'
+		// Render the paypal button into #paypal-button-container
+		paypal.Buttons({
+
+			onError: function(err) {
+        console.error('PayPal Button error:', err);
+    		},
+
+			style: {
+				color: 'blue',
+				shape: 'rect',
+				label: 'pay',
+			},
+
+
+
+			// Set up the transaction
+			createOrder: function(data, actions) {
+				return actions.order.create({
+					purchase_units: [{
+						amount: {
+							value:parseFloat(total).toFixed(2)
+						}
+					}]
+				});
+			},
+			// Finalize the transaction
+			onApprove: function(data, actions) {
+				return actions.order.capture().then(function(details) {
+					// Show a success message to the buyer
+<!--					alert('Transaction completed by ' + details.payer.name.given_name + '!');-->
+					submitFormData()
+				});
+			}
+		}).render('#paypal-button-container');
+	</script>
+
+
+<script type="text/javascript">
+        // Variables de contexto de Django (asegúrate de que esten en este script)
+        var shipping = '{{order.shipping|yesno:"True,False"}}'
+        var total = '{{order.get_cart_total|floatformat:2}}'
+        var user = '{{request.user.is_authenticated|yesno:"True,False"}}'
+        // 'csrftoken' debe estar disponible globalmente o definirse aquí también.
+        // var csrftoken = '{{ csrf_token }}';
+
+
+        // Lógica para ocultar/mostrar secciones (tal como te la di en el último paso)
+        if (shipping == 'False'){
+           document.getElementById('shipping-info').innerHTML = ''
+        }
+
+        // Asegúrate de que esta sección esté eliminada o comentada
+        // if (user != 'AnonymousUser'){
+        //    document.getElementById('user-info').innerHTML = ''
+        // }
+
+        if (shipping == 'False' && user == 'True'){
+           document.getElementById('form-wrapper').classList.add("hidden");
+           document.getElementById('payment-info').classList.remove("hidden");
+        }
+
+        // El evento 'submit' del formulario principal
+        var form = document.getElementById('form')
+        form.addEventListener('submit', function(e){
+           e.preventDefault()
+           console.log('Formulario enviado (solo para mostrar PayPal)...')
+           document.getElementById('form-button').classList.add("hidden");
+           document.getElementById('payment-info').classList.remove("hidden");
+        })
+
+        // Función 1: Para validar los datos del pedido en el backend
+        function validateOrderAndGetId() {
+            console.log('Paso 1: Validando datos del pedido en el backend...');
+
+            var userName = document.querySelector('input[name="name"]').value;
+            var userEmail = document.querySelector('input[name="email"]').value;
+
+            var userFormData = {
+                'name': userName,
+                'email': userEmail,
+                'total': total,
+            };
+
+            var shippingInfo = {
+                'address': '',
+                'city': '',
+                'state': '',
+                'zipcode': '',
+                'phone_number': '',
+            };
+
+            if (shipping == 'True') {
+                shippingInfo.address = document.querySelector('input[name="address"]').value;
+                shippingInfo.city = document.querySelector('input[name="city"]').value;
+                shippingInfo.state = document.querySelector('input[name="state"]').value;
+                shippingInfo.zipcode = document.querySelector('input[name="zipcode"]').value;
+                shippingInfo.phone_number = document.querySelector('input[name="phone_number"]').value;
+            }
+
+            var url = "/process_order/";
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken, // Asegúrate de que 'csrftoken' esté definido
+                },
+                body: JSON.stringify({'form': userFormData, 'shipping': shippingInfo}),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'Error de validación del pedido.');
+                    });
+                }
+                return response.json();
+            });
+        }
+
+        // Función 2: Para completar la orden en el backend después de PayPal
+        function completeOrderOnBackend(orderId, paypalTransactionId) {
+            console.log('Paso 4: Completando pedido en el backend después de PayPal capture...');
+            var url = "/complete_order/";
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken, // Asegúrate de que 'csrftoken' esté definido
+                },
+                body: JSON.stringify({
+                    'order_id': orderId,
+                    'paypal_transaction_id': paypalTransactionId,
+                }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || 'Error al finalizar el pedido en el servidor.');
+                    });
+                }
+                return response.json();
+            });
+        }
+
+        // --- INTEGRACIÓN CON LOS BOTONES DE PAYPAL ---
+        paypal.Buttons({
+            createOrder: function(data, actions) {
+                console.log('Paso 2: Creando orden en PayPal...');
+                return actions.order.create({
+                    purchase_units: [{
+                        amount: {
+                            value: total,
+                            currency_code: 'EUR'
+                        }
+                    }]
+                });
+            },
+            onApprove: function(data, actions) {
+                let backendOrderId = null;
+
+                console.log('Paso 3: PayPal autorizado. Validando pedido en Django antes de capturar...');
+                return validateOrderAndGetId()
+                    .then(backendResponse => {
+                        backendOrderId = backendResponse.order_id;
+                        console.log('Validación de Django exitosa. Order ID:', backendOrderId);
+
+                        console.log('Paso 4: Validación OK, capturando pago con PayPal...');
+                        return actions.order.capture();
+                    })
+                    .then(paypalCaptureDetails => {
+                        console.log('Paso 5: PayPal capture exitoso. Finalizando orden en Django...');
+                        const paypalTransactionId = paypalCaptureDetails.id;
+                        return completeOrderOnBackend(backendOrderId, paypalTransactionId);
+                    })
+                    .then(finalBackendResponse => {
+                        console.log('Paso 6: Pedido completado con éxito en el backend:', finalBackendResponse);
+                        alert('¡Pago completado y pedido procesado con éxito!');
+
+                        cart = {};
+                        document.cookie = 'cart=' + JSON.stringify(cart) + ";domain=;path=/";
+
+                        if (finalBackendResponse && finalBackendResponse.order_id) {
+                            window.location.href = "{% url 'order_complete' 0 %}".replace('0', finalBackendResponse.order_id);
+                        } else {
+                            window.location.href = "{% url 'store' %}";
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error durante el proceso de pago o finalización:', error);
+                        alert(error.message || 'Ocurrió un error inesperado durante el pago. Por favor, inténtalo de nuevo.');
+                        document.getElementById('form-button').classList.remove("hidden");
+                        document.getElementById('payment-info').classList.add("hidden");
+                    });
+            },
+            onCancel: function(data) {
+                console.log('Pago cancelado por el usuario');
+                alert('Pago cancelado. Puedes intentar de nuevo.');
+                document.getElementById('form-button').classList.remove("hidden");
+                document.getElementById('payment-info').classList.add("hidden");
+            },
+            onError: function(err) {
+                console.error('Error general de PayPal SDK:', err);
+                alert('Un error ocurrió con PayPal: ' + err.message);
+                document.getElementById('form-button').classList.remove("hidden");
+                document.getElementById('payment-info').classList.add("hidden");
+            }
+        }).render('#paypal-button-container'); // Asegúrate de que tienes un div con este ID
+     </script>
+
+{% endblock content %}

@@ -117,43 +117,148 @@ def signup(request):
 # -----------------------------------------------------------------------
 # VISTAS DE PROCESAMIENTO DE PEDIDO Y DESCARGAS DIGITALES
 # -----------------------------------------------------------------------
+# @csrf_exempt
+# def processOrder(request):
+#     transaction_id = datetime.datetime.now().timestamp()
+#     data = json.loads(request.body)
+#
+#     print(f"DEBUG: Datos recibidos (data): {data}") # Mantén este print para depuración
+#
+#     customer = None
+#     order = None
+#
+#     if request.user.is_authenticated:
+#         customer = request.user.customer
+#         order, created = Order.objects.get_or_create(customer=customer, complete=False)
+#     else:
+#         customer, order = guestOrder(request, data)
+#
+#     try:
+#         total = Decimal(data['form']['total'])
+#     except (TypeError, ValueError):
+#         return JsonResponse({'error': 'Total del formulario inválido'}, status=400)
+#
+#     user_form_name = data['form'].get('name', '').strip()
+#     user_form_email = data['form'].get('email', '').strip()
+#
+#     shipping_data = data.get('shipping', {})
+#
+#     print(f"DEBUG: Contenido de shipping_data: {shipping_data} (Tipo: {type(shipping_data)})") # Mantén este print
+#
+#     # --- CAMBIO CLAVE AQUÍ: Aseguramos que el resultado de .get() sea una cadena antes de .strip() ---
+#     address = str(shipping_data.get('address', '') or '').strip()
+#     city = str(shipping_data.get('city', '') or '').strip()
+#     state = str(shipping_data.get('state', '') or '').strip()
+#     zipcode = str(shipping_data.get('zipcode', '') or '').strip()
+#     phone_number = str(shipping_data.get('phone_number', '') or '').strip()
+#     # --- FIN CAMBIO CLAVE ---
+#
+#     print(f"DEBUG: Valor de phone_number recibido (después de strip): '{phone_number}'") # Mantén este print
+#
+#     # 1. Validar nombre y email SIEMPRE
+#     if not user_form_name:
+#         return JsonResponse({'error': 'El campo "Nombre completo" es obligatorio.'}, status=400)
+#     if not user_form_email:
+#         return JsonResponse({'error': 'El campo "Email" es obligatorio.'}, status=400)
+#
+#     # 2. Validar campos de envío y teléfono SOLO SI el pedido requiere envío
+#     if order.shipping:
+#         required_shipping_fields = {
+#             'Dirección': address,
+#             'Ciudad': city,
+#             'Provincia': state,
+#             'Código Postal': zipcode,
+#             'Número de Teléfono': phone_number,
+#         }
+#
+#         for field_name, value in required_shipping_fields.items():
+#             if not value:
+#                 return JsonResponse({'error': f'El campo "{field_name}" es obligatorio para este pedido con envío.'}, status=400)
+#
+#         # 3. Validar formato del número de teléfono
+#         phone_regex = r'^\+?[\d\s-]{7,20}$'
+#         print(f"DEBUG: Regex a usar para teléfono: '{phone_regex}'") # Mantén este print
+#         print(f"DEBUG: ¿Coincide '{phone_number}' con el regex? {bool(re.fullmatch(phone_regex, phone_number))}") # Mantén este print
+#
+#         if not re.fullmatch(phone_regex, phone_number):
+#             return JsonResponse({'error': 'El "Número de Teléfono" no tiene un formato válido. Debe contener solo números, espacios o guiones, y tener una longitud razonable.'}, status=400)
+#
+#     # Lógica de comparación de precios y completitud de la orden
+#     if total.quantize(Decimal('0.01')) == order.get_cart_total.quantize(Decimal('0.01')):
+#         order.complete = True
+#         order.transaction_id = transaction_id
+#         order.date_ordered = datetime.datetime.now()
+#     else:
+#         print(f"DEBUG: Comparación de total fallida - Form: {total} vs Cart: {order.get_cart_total}")
+#         return JsonResponse({'error': 'Error de precios: El total no coincide. Pedido no procesado.'}, status=400)
+#
+#     order.save()
+#
+#     # Creación de ShippingAddress solo si el pedido requiere envío
+#     if order.shipping:
+#         ShippingAddress.objects.create(
+#             customer=customer,
+#             order=order,
+#             address=address,
+#             city=city,
+#             state=state,
+#             zipcode=zipcode,
+#             phone_number=phone_number,
+#         )
+#
+#     with transaction.atomic():
+#         for item in order.orderitem_set.all():
+#             if item.product and item.product.has_digital_file:
+#                 if not item.download_token:
+#                     item.download_token = uuid.uuid4()
+#                     item.save()
+#
+#     if not request.user.is_authenticated:
+#         request.session['guest_order_id'] = order.id
+#
+#     return JsonResponse({'message': 'Pedido procesado con éxito', 'order_id': order.id}, status=200)
+#
+#
 
 @csrf_exempt
 def processOrder(request):
-    # ... (código existente para procesar el pedido y obtener 'data') ...
-
-    transaction_id = datetime.datetime.now().timestamp()
     data = json.loads(request.body)
+
+    print(f"DEBUG: Datos recibidos (data) para VALIDACIÓN: {data}")
 
     customer = None
     order = None
 
     if request.user.is_authenticated:
         customer = request.user.customer
+        # Obtener o crear una orden incompleta para este cliente
         order, created = Order.objects.get_or_create(customer=customer, complete=False)
     else:
+        # Para invitados, crear una orden temporal (que se guardará en sesión en guestOrder)
+        # Esta orden NO ESTÁ COMPLETA aún.
         customer, order = guestOrder(request, data)
 
+    # Validar el total del formulario con el total del carrito de la orden
     try:
-        total = Decimal(data['form']['total'])
+        form_total = Decimal(data['form']['total'])
     except (TypeError, ValueError):
         return JsonResponse({'error': 'Total del formulario inválido'}, status=400)
 
-    # --- INICIO DE LA LÓGICA DE VALIDACIÓN MEJORADA (con teléfono) ---
+    # Comparar los totales para prevenir manipulaciones de precios
+    if form_total.quantize(Decimal('0.01')) != order.get_cart_total.quantize(Decimal('0.01')):
+        print(f"DEBUG: Comparación de total fallida - Form: {form_total} vs Cart: {order.get_cart_total}")
+        return JsonResponse({'error': 'Error de precios: El total no coincide. Pedido no procesado.'}, status=400)
 
+    # Recoger y sanear los datos del formulario de usuario y envío
     user_form_name = data['form'].get('name', '').strip()
     user_form_email = data['form'].get('email', '').strip()
 
     shipping_data = data.get('shipping', {})
-    address = shipping_data.get('address', '').strip()
-    city = shipping_data.get('city', '').strip()
-    state = shipping_data.get('state', '').strip()
-    zipcode = shipping_data.get('zipcode', '').strip()
-    phone_number = shipping_data.get('phone_number', '').strip()
-
-    # --- INICIO DE LÍNEAS DE DEPURACIÓN ---
-    print(f"DEBUG: Valor de phone_number recibido: '{phone_number}'")
-    # --- FIN DE LÍNEAS DE DEPURACIÓN ---
+    address = str(shipping_data.get('address', '') or '').strip()
+    city = str(shipping_data.get('city', '') or '').strip()
+    state = str(shipping_data.get('state', '') or '').strip()
+    zipcode = str(shipping_data.get('zipcode', '') or '').strip()
+    phone_number = str(shipping_data.get('phone_number', '') or '').strip()
 
     # 1. Validar nombre y email SIEMPRE
     if not user_form_name:
@@ -168,56 +273,78 @@ def processOrder(request):
             'Ciudad': city,
             'Provincia': state,
             'Código Postal': zipcode,
-            'Número de Teléfono': phone_number, # Campo que estamos validando
+            'Número de Teléfono': phone_number,
         }
-
         for field_name, value in required_shipping_fields.items():
             if not value:
                 return JsonResponse({'error': f'El campo "{field_name}" es obligatorio para este pedido con envío.'}, status=400)
 
-        # 3. Validar formato del número de teléfono (solo si el envío es requerido y el campo no está vacío)
-        # Regex para números de teléfono:
-        # ^         -> Inicio de la cadena
-        # \+?       -> Cero o una vez el signo '+' (para números internacionales)
-        # [\d\s-]{7,20} -> De 7 a 20 caracteres que pueden ser dígitos (\d), espacios (\s) o guiones (-)
-        # $         -> Fin de la cadena
-        #
-        # Este regex es bastante flexible para aceptar varios formatos comunes.
-        # Si necesitas ser más estricto (ej. solo 9 dígitos para España), avísame.
+        # 3. Validar formato del número de teléfono
         phone_regex = r'^\+?[\d\s-]{7,20}$'
-
-        # --- MÁS LÍNEAS DE DEPURACIÓN ---
-        print(f"DEBUG: Regex a usar: '{phone_regex}'")
-        print(
-            f"DEBUG: ¿Coincide el número '{phone_number}' con el regex? {bool(re.fullmatch(phone_regex, phone_number))}")
-        # --- FIN MÁS LÍNEAS DE DEPURACIÓN ---
-
         if not re.fullmatch(phone_regex, phone_number):
             return JsonResponse({'error': 'El "Número de Teléfono" no tiene un formato válido. Debe contener solo números, espacios o guiones, y tener una longitud razonable.'}, status=400)
 
-    # --- FIN DE LA LÓGICA DE VALIDACIÓN MEJORADA ---
+    # Si todas las validaciones pasan:
+    # Actualizar la información del cliente (nombre, email)
+    if customer: # customer siempre debería existir aquí
+        customer.name = user_form_name
+        customer.email = user_form_email
+        customer.save()
 
-    # ... (resto de la lógica de comparación de precios, order.save(), ShippingAddress.create(), etc.) ...
-    if total.quantize(Decimal('0.01')) == order.get_cart_total.quantize(Decimal('0.01')):
-        order.complete = True
-        order.transaction_id = transaction_id
-    else:
-        print(f"DEBUG: Comparación de total fallida - Total del formulario: {total} vs Total del carrito: {order.get_cart_total}")
-        return JsonResponse({'error': 'Error de precios: El total no coincide. Pedido no procesado.'}, status=400)
-
-    order.save()
-
+    # Crear o actualizar la dirección de envío (si es necesaria)
     if order.shipping:
-        ShippingAddress.objects.create(
+        # Usa update_or_create para manejar si ya existe una dirección para esta orden incompleta
+        ShippingAddress.objects.update_or_create(
             customer=customer,
             order=order,
-            address=address,
-            city=city,
-            state=state,
-            zipcode=zipcode,
-            phone_number=phone_number,
+            defaults={
+                'address': address,
+                'city': city,
+                'state': state,
+                'zipcode': zipcode,
+                'phone_number': phone_number,
+            }
         )
 
+    # En este punto, la orden está validada y los datos iniciales guardados,
+    # pero la orden NO está marcada como completa todavía.
+    # Devolvemos el order.id para que el frontend pueda usarlo en la fase de completado.
+    return JsonResponse({'message': 'Validación de pedido exitosa.', 'order_id': order.id}, status=200)
+
+
+# NUEVA FUNCIÓN: completeOrder
+@csrf_exempt
+def completeOrder(request):
+    data = json.loads(request.body)
+    order_id = data.get('order_id')
+    paypal_transaction_id = data.get('paypal_transaction_id')
+
+    if not order_id or not paypal_transaction_id:
+        return JsonResponse({'error': 'Faltan datos para finalizar el pedido.'}, status=400)
+
+    try:
+        # Obtener la orden que fue validada previamente
+        if request.user.is_authenticated:
+            customer = request.user.customer
+            # Asegura que solo el cliente dueño de la orden pueda completarla
+            order = Order.objects.get(id=order_id, customer=customer, complete=False)
+        else:
+            # Para pedidos de invitados, verifica el ID de la sesión
+            guest_order_id_in_session = request.session.get('guest_order_id')
+            if str(guest_order_id_in_session) != str(order_id):
+                 return JsonResponse({'error': 'Acceso no autorizado a la orden de invitado.'}, status=403)
+            order = Order.objects.get(id=order_id, complete=False) # Para invitados, solo el ID es suficiente
+
+    except Order.DoesNotExist:
+        return JsonResponse({'error': 'Pedido no encontrado o ya ha sido completado.'}, status=404)
+
+    # Marcar la orden como completa AHORA que el pago ha sido confirmado por PayPal
+    order.complete = True
+    order.transaction_id = paypal_transaction_id  # Guardar el ID de transacción de PayPal
+    order.date_ordered = datetime.datetime.now()
+    order.save()
+
+    # Generar tokens de descarga para productos digitales (movido aquí desde processOrder)
     with transaction.atomic():
         for item in order.orderitem_set.all():
             if item.product and item.product.has_digital_file:
@@ -225,14 +352,12 @@ def processOrder(request):
                     item.download_token = uuid.uuid4()
                     item.save()
 
+    # Limpiar el ID de la orden de invitado de la sesión si aplica
     if not request.user.is_authenticated:
-        request.session['guest_order_id'] = order.id
+        if 'guest_order_id' in request.session:
+            del request.session['guest_order_id']
 
-    return JsonResponse({'message': 'Pedido procesado con éxito', 'order_id': order.id}, status=200)
-
-
-
-
+    return JsonResponse({'message': 'Pedido completado con éxito', 'order_id': order.id}, status=200)
 
 # @login_required # <--- ¡ELIMINA O COMENTA ESTA LÍNEA!
 def order_complete(request, order_id):
