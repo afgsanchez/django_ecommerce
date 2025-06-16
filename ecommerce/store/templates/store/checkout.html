@@ -20,7 +20,7 @@
 
                     <div id="shipping-info">
                         <hr>
-						<p>Por favor, introduzca su nombre y apellidos para el envío.!</p>
+						<p>Por favor, introduzca su nombre y apellidos para el envío!</p>
 						<p>Informacion de Envío:</p>
 						<hr>
 						<div class="form-field">
@@ -81,191 +81,151 @@
 	<script src="https://www.paypal.com/sdk/js?client-id=ASWRlLR2zxBtvTy1_AY7pOkUg2KxrL21CpJh7-vHLZf2aWcX3WgZ8QkxkoOA7X380ARHS2Cuyra1cM6m&currency=EUR"></script>
 
 	<script type="text/javascript">
-			// Variables de contexto de Django
-		var shipping = '{{order.shipping|yesno:"True,False"}}';
-		var total = '{{order.get_cart_total|floatformat:2}}';
-		var user = '{{request.user.is_authenticated|yesno:"True,False"}}';
-		// Asegúrate de que 'csrftoken' esté disponible. Si no lo está globalmente, descomenta la siguiente línea:
-		var csrftoken = '{{ csrf_token }}';
+	// Variables de contexto de Django
+var shipping = '{{order.shipping|yesno:"True,False"}}';
+var total = '{{order.get_cart_total|floatformat:2}}';
+var user = '{{request.user.is_authenticated|yesno:"True,False"}}';
+var csrftoken = '{{ csrf_token }}';
 
-		// Lógica para ocultar/mostrar secciones
-		if (shipping == 'False'){
-		   document.getElementById('shipping-info').innerHTML = '';
-		}
+// Lógica para ocultar/mostrar secciones
+if (shipping == 'False'){
+   document.getElementById('shipping-info').innerHTML = '';
+}
 
-		// Este bloque oculta el formulario COMPLETO si el usuario está logueado Y solo compra digital
-		if (shipping == 'False' && user == 'True'){
-		   document.getElementById('form-wrapper').classList.add("hidden");
-		   document.getElementById('payment-info').classList.remove("hidden");
-		}
+// Este bloque oculta el formulario COMPLETO si el usuario está logueado Y solo compra digital
+if (shipping == 'False' && user == 'True'){
+   document.getElementById('form-wrapper').classList.add("hidden");
+   document.getElementById('payment-info').classList.remove("hidden");
+}
 
-		var form = document.getElementById('form'); // Referencia al formulario principal
-		form.addEventListener('submit', function(e){
-		   e.preventDefault();
-		   console.log('Formulario enviado (solo para mostrar PayPal)...');
-		   document.getElementById('form-button').classList.add("hidden");
-		   document.getElementById('payment-info').classList.remove("hidden");
-		});
+var form = document.getElementById('form'); // Referencia al formulario principal
+form.addEventListener('submit', function(e){
+   e.preventDefault();
+   console.log('Formulario enviado (solo para mostrar PayPal)...');
+   document.getElementById('form-button').classList.add("hidden");
+   document.getElementById('payment-info').classList.remove("hidden");
+});
 
-		// Función 1: Para validar los datos del pedido en el backend y obtener el order_id
-		function validateOrderAndGetId() {
-			console.log('Paso 1: Validando datos del pedido en el backend...');
+// Función 1: Para validar los datos del pedido en el backend y obtener el order_id
+function validateOrderAndGetId() {
+    console.log('Paso 1: Validando datos del pedido en el backend...');
+    var userName = document.querySelector('input[name="name"]').value;
+    var userEmail = document.querySelector('input[name="email"]').value;
 
-			// Recoge los valores directamente de los inputs del formulario
-			var userName = document.querySelector('input[name="name"]').value;
-			var userEmail = document.querySelector('input[name="email"]').value;
+    var userFormData = {
+        'name': userName,
+        'email': userEmail,
+        'total': total,
+    };
 
-			var userFormData = {
-				'name': userName,
-				'email': userEmail,
-				'total': total,
-			};
+    var shippingInfo = {
+        'address': '', 'city': '', 'state': '', 'zipcode': '', 'phone_number': '',
+    };
 
-			var shippingInfo = {
-				'address': '',
-				'city': '',
-				'state': '',
-				'zipcode': '',
-				'phone_number': '',
-			};
+    if (shipping == 'True') {
+        shippingInfo.address = document.querySelector('input[name="address"]').value;
+        shippingInfo.city = document.querySelector('input[name="city"]').value;
+        shippingInfo.state = document.querySelector('input[name="state"]').value;
+        shippingInfo.zipcode = document.querySelector('input[name="zipcode"]').value;
+        shippingInfo.phone_number = document.querySelector('input[name="phone_number"]').value;
+    }
 
-			// Si el envío es requerido, entonces recoge los valores de los campos de envío
-			if (shipping == 'True') {
-				shippingInfo.address = document.querySelector('input[name="address"]').value;
-				shippingInfo.city = document.querySelector('input[name="city"]').value;
-				shippingInfo.state = document.querySelector('input[name="state"]').value;
-				shippingInfo.zipcode = document.querySelector('input[name="zipcode"]').value;
-				shippingInfo.phone_number = document.querySelector('input[name="phone_number"]').value;
-			}
+    var url = "/process_order/";
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify({'form': userFormData, 'shipping': shippingInfo}),
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errorData => {
+                throw new Error(errorData.error || 'Error de validación del pedido.');
+            });
+        }
+        return response.json();
+    });
+}
 
-			var url = "/process_order/"; // Esta URL es para la validación y creación/actualización inicial de la orden
+// Función 2: Para completar la orden en el backend después de que PayPal haya capturado el pago
+function completeOrderOnBackend(orderId, paypalTransactionId) {
+    console.log('Paso 4: Completando pedido en el backend después de PayPal capture...');
+    var url = "/complete_order/";
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+        body: JSON.stringify({ 'order_id': orderId, 'paypal_transaction_id': paypalTransactionId }),
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(errorData => {
+                throw new Error(errorData.error || 'Error al finalizar el pedido en el servidor.');
+            });
+        }
+        return response.json();
+    });
+}
 
-			return fetch(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-CSRFToken': csrftoken,
-				},
-				body: JSON.stringify({'form': userFormData, 'shipping': shippingInfo}),
-			})
-			.then(response => {
-				if (!response.ok) {
-					// Si la validación del backend falla, lanza un error con el mensaje
-					return response.json().then(errorData => {
-						throw new Error(errorData.error || 'Error de validación del pedido.');
-					});
-				}
-				return response.json(); // Si la validación es exitosa, devuelve la respuesta (que incluye order_id)
-			});
-		}
+// --- INTEGRACIÓN CON LOS BOTONES DE PAYPAL ---
+window.onload = function() {
+    paypal.Buttons({
+        createOrder: function(data, actions) {
+            console.log('Paso 2: Creando orden en PayPal...');
+            return actions.order.create({
+                purchase_units: [{ amount: { value: total, currency_code: 'EUR' } }]
+            });
+        },
+        onApprove: function(data, actions) {
+            let backendOrderId = null;
+            console.log('Paso 3: PayPal autorizado. Validando pedido en Django antes de capturar...');
 
-		// Función 2: Para completar la orden en el backend después de que PayPal haya capturado el pago
-		function completeOrderOnBackend(orderId, paypalTransactionId) {
-			console.log('Paso 4: Completando pedido en el backend después de PayPal capture...');
-			var url = "/complete_order/"; // Nueva URL para finalizar la orden
+            return validateOrderAndGetId()
+                .then(backendResponse => {
+                    backendOrderId = backendResponse.order_id;
+                    console.log('Validación de Django exitosa. Order ID:', backendOrderId);
+                    console.log('Paso 4: Validación OK, capturando pago con PayPal...');
+                    return actions.order.capture();
+                })
+                .then(paypalCaptureDetails => {
+                    console.log('Paso 5: PayPal capture exitoso. Finalizando orden en Django...');
+                    const paypalTransactionId = paypalCaptureDetails.id;
+                    return completeOrderOnBackend(backendOrderId, paypalTransactionId);
+                })
+                .then(finalBackendResponse => {
+                    console.log('Paso 6: Pedido completado con éxito en el backend:', finalBackendResponse);
+                    alert('¡Pago completado y pedido procesado con éxito!');
 
-			return fetch(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-CSRFToken': csrftoken,
-				},
-				body: JSON.stringify({
-					'order_id': orderId,
-					'paypal_transaction_id': paypalTransactionId,
-				}),
-			})
-			.then(response => {
-				if (!response.ok) {
-					return response.json().then(errorData => {
-						throw new Error(errorData.error || 'Error al finalizar el pedido en el servidor.');
-					});
-				}
-				return response.json();
-			});
-		}
+                    cart = {};
+                    document.cookie = 'cart=' + JSON.stringify(cart) + ";domain=;path=/";
 
-		// --- INTEGRACIÓN CON LOS BOTONES DE PAYPAL (ÚNICA LLAMADA A paypal.Buttons) ---
-		// Esta sección solo se ejecuta UNA VEZ para renderizar los botones.
-		window.onload = function() { // Envuelto en window.onload para asegurar que el DOM esté listo
-			paypal.Buttons({
-				createOrder: function(data, actions) {
-					// Paso 2: Crear una orden en PayPal. Esto NO valida los datos del formulario de Django aún.
-					console.log('Paso 2: Creando orden en PayPal...');
-					return actions.order.create({
-						purchase_units: [{
-							amount: {
-								value: total, // Usa la variable 'total' que obtienes de Django
-								currency_code: 'EUR' // ¡IMPORTANTE! Ajusta a tu moneda real (USD, MXN, etc.)
-							}
-						}]
-					});
-				},
-				onApprove: function(data, actions) {
-					let backendOrderId = null; // Variable para guardar el order_id de Django
-
-					// Paso 3: PayPal ha autorizado el pago. AHORA validamos datos del formulario en Django.
-					console.log('Paso 3: PayPal autorizado. Validando pedido en Django antes de capturar...');
-					return validateOrderAndGetId()
-						.then(backendResponse => {
-							// Si la validación de Django fue exitosa, guarda el order_id de Django
-							backendOrderId = backendResponse.order_id;
-							console.log('Validación de Django exitosa. Order ID:', backendOrderId);
-
-							// Paso 4: Si la validación de Django es OK, captura el pago con PayPal.
-							// Si la validación falló, el 'catch' de abajo ya habrá actuado.
-							console.log('Paso 4: Validación OK, capturando pago con PayPal...');
-							return actions.order.capture();
-						})
-						.then(paypalCaptureDetails => {
-							// Paso 5: Si la captura de PayPal es exitosa, finaliza la orden en tu backend.
-							console.log('Paso 5: PayPal capture exitoso. Finalizando orden en Django...');
-							const paypalTransactionId = paypalCaptureDetails.id; // ID de transacción de PayPal
-
-							return completeOrderOnBackend(backendOrderId, paypalTransactionId);
-						})
-						.then(finalBackendResponse => {
-							// Paso 6: Todo el proceso ha sido exitoso (validación, pago y finalización).
-							console.log('Paso 6: Pedido completado con éxito en el backend:', finalBackendResponse);
-							alert('¡Pago completado y pedido procesado con éxito!');
-
-							// Limpiar el carrito y redirigir
-							cart = {};
-							document.cookie = 'cart=' + JSON.stringify(cart) + ";domain=;path=/";
-
-							if (finalBackendResponse && finalBackendResponse.order_id) {
-								window.location.href = "{% url 'order_complete' 0 %}".replace('0', finalBackendResponse.order_id);
-							} else {
-								window.location.href = "{% url 'store' %}";
-							}
-						})
-						.catch(error => {
-							// Este bloque catch maneja errores de CUALQUIERA de los pasos anteriores:
-							// 1. validateOrderAndGetId() (Errores de validación de Django)
-							// 2. actions.order.capture() (Errores durante la captura de PayPal)
-							// 3. completeOrderOnBackend() (Errores durante la finalización en Django)
-							console.error('Error durante el proceso de pago o finalización:', error);
-							alert(error.message || 'Ocurrió un error inesperado durante el pago. Por favor, inténtalo de nuevo.');
-
-							// Volver a habilitar el botón del formulario y ocultar info de pago
-							document.getElementById('form-button').classList.remove("hidden");
-							document.getElementById('payment-info').classList.add("hidden");
-						});
-				},
-				onCancel: function(data) {
-					console.log('Pago cancelado por el usuario');
-					alert('Pago cancelado. Puedes intentar de nuevo.');
-					document.getElementById('form-button').classList.remove("hidden");
-					document.getElementById('payment-info').classList.add("hidden");
-				},
-				onError: function(err) {
-					console.error('Error general de PayPal SDK:', err);
-					alert('Un error ocurrió con PayPal: ' + err.message);
-					document.getElementById('form-button').classList.remove("hidden");
-					document.getElementById('payment-info').classList.add("hidden");
-				}
-			}).render('#paypal-button-container');
-		}; // CIERRE DE window.onload
+                    // --- CAMBIO CLAVE AQUÍ: Redirigimos directamente ---
+                    if (finalBackendResponse && finalBackendResponse.order_id) {
+                        window.location.href = "{% url 'order_complete' 0 %}".replace('0', finalBackendResponse.order_id);
+                    } else {
+                        window.location.href = "{% url 'store' %}";
+                    }
+                    // --- FIN CAMBIO CLAVE ---
+                })
+                .catch(error => {
+                    console.error('Error durante el proceso de pago o finalización:', error);
+                    alert(error.message || 'Ocurrió un error inesperado durante el pago. Por favor, inténtalo de nuevo.');
+                    document.getElementById('form-button').classList.remove("hidden");
+                    document.getElementById('payment-info').classList.add("hidden");
+                });
+        },
+        onCancel: function(data) {
+            console.log('Pago cancelado por el usuario');
+            alert('Pago cancelado. Puedes intentar de nuevo.');
+            document.getElementById('form-button').classList.remove("hidden");
+            document.getElementById('payment-info').classList.add("hidden");
+        },
+        onError: function(err) {
+            console.error('Error general de PayPal SDK:', err);
+            alert('Un error ocurrió con PayPal: ' + err.message);
+            document.getElementById('form-button').classList.remove("hidden");
+            document.getElementById('payment-info').classList.add("hidden");
+        }
+    }).render('#paypal-button-container');
+};
 	</script>
 
 {% endblock content %}

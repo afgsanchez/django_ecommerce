@@ -7,7 +7,8 @@ from decimal import Decimal
 class Customer(models.Model):
     user = models.OneToOneField(User, null=True, blank=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=200, null=True)
-    email = models.EmailField(max_length=200, unique=True)
+    email = models.EmailField(max_length=200, null=True, unique=False)
+    device = models.CharField(max_length=200, null=True, blank=True)
 
     def __str__(self):
         return self.name if self.name else 'Cliente Anónimo' # Mejorar representación si name es None
@@ -43,6 +44,7 @@ class Order(models.Model):
     date_ordered = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     complete = models.BooleanField(default=False, verbose_name="PAYMENT COMPLETED")
     transaction_id = models.CharField(max_length=100, null=True)
+    is_processed = models.BooleanField(default=False, verbose_name="PEDIDO GESTIONADO")
 
     def __str__(self):
         return str(self.id)

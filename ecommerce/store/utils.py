@@ -1,41 +1,38 @@
 import json
-from .models import *
+import uuid # Necesario para generar IDs únicos para dispositivos
+from decimal import Decimal # Para manejar números decimales con precisión
 
-
-import json
-from django.core.exceptions import ObjectDoesNotExist
-
-# store/utils.py
-
-import json
-from decimal import Decimal # <--- ¡IMPORTA DECIMAL!
-from .models import Product # <--- Asegúrate de que Product esté importado
-from django.core.exceptions import ObjectDoesNotExist # <--- Asegúrate de que ObjectDoesNotExist esté importado
+from django.core.exceptions import ObjectDoesNotExist # Para manejar errores cuando un objeto no se encuentra
+from .models import Product, Order, OrderItem, Customer # Asegúrate de que todos estos modelos estén importados
 
 def cookieCart(request):
+    """
+    Función para obtener los datos del carrito de la cookie del navegador.
+    Maneja el caso de que la cookie no exista o esté corrupta.
+    """
     try:
         cart = json.loads(request.COOKIES.get('cart', '{}'))
     except json.JSONDecodeError:
+        # Si la cookie 'cart' no es un JSON válido, se inicializa como un diccionario vacío.
         cart = {}
 
     items = []
-    # Inicializa get_cart_total como un objeto Decimal
+    # Inicializa los totales de la orden como objetos Decimal para precisión
     order = {'get_cart_total': Decimal('0.00'), 'get_cart_items': 0, 'shipping': False}
     cartItems = 0
 
     for product_id, product_data in cart.items():
         try:
             quantity = product_data.get('quantity', 0)
-            # Asegúrate de que quantity sea un entero
+            # Asegúrate de que quantity sea un entero válido
             quantity = int(quantity)
 
             product = Product.objects.get(id=product_id)
 
-            # Convierte product.price a Decimal si no lo es (ya debería serlo si es DecimalField)
-            # y realiza la multiplicación. El resultado será un Decimal.
-            total = product.price * Decimal(quantity) # Multiplica Decimal por Decimal o int
+            # Calcula el total del ítem. product.price ya debería ser Decimal.
+            total = product.price * Decimal(quantity)
 
-            # Suma el total (que es un Decimal) al get_cart_total (que también es un Decimal)
+            # Suma al total general de la orden
             order['get_cart_total'] += total
             order['get_cart_items'] += quantity
             cartItems += quantity
@@ -45,104 +42,47 @@ def cookieCart(request):
                 'product': {
                     'id': product.id,
                     'name': product.name,
-                    'price': product.price, # Esto es un Decimal
+                    'price': product.price,
                     'imageURL': product.imageURL,
+                    'digital': product.digital # Asegúrate de que el campo 'digital' esté disponible en tu modelo Product
                 },
                 'quantity': quantity,
-                'digital': product.digital,
-                'get_total': total, # Esto también es un Decimal
+                'get_total': total,
             }
             items.append(item)
 
+            # Determina si la orden requiere envío (si contiene al menos un producto no digital)
             if not product.digital:
                 order['shipping'] = True
 
-        except (ObjectDoesNotExist, ValueError) as e: # Captura también ValueError para int(quantity)
-            print(f"Error processing item in cookieCart: {e}") # Para depuración
-            continue
+        except (ObjectDoesNotExist, ValueError) as e:
+            # Si el producto no existe o la cantidad no es un número válido, se ignora el ítem.
+            print(f"DEBUG: Error al procesar ítem en cookieCart (ID: {product_id}): {e}. Saltando este ítem.")
+            continue # Continúa con el siguiente ítem en el carrito de la cookie
 
     return {'cartItems': cartItems, 'order': order, 'items': items}
 
-# def cookieCart(request):
-#     try:
-#         cart = json.loads(request.COOKIES.get('cart', '{}'))
-#     except json.JSONDecodeError:
-#         cart = {}
-#
-#     items = []
-#     order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-#     cartItems = 0  # Inicializar contador de items
-#
-#     for product_id, product_data in cart.items():
-#         try:
-#             quantity = product_data.get('quantity', 0)
-#             product = Product.objects.get(id=product_id)
-#
-#             total = product.price * quantity
-#             order['get_cart_total'] += total
-#             order['get_cart_items'] += quantity
-#             cartItems += quantity
-#
-#             item = {
-#                 'id': product.id,
-#                 'product': {
-#                     'id': product.id,
-#                     'name': product.name,
-#                     'price': product.price,
-#                     'imageURL': product.imageURL,
-#                 },
-#                 'quantity': quantity,
-#                 'digital': product.digital,
-#                 'get_total': total,
-#             }
-#             items.append(item)
-#
-#             if not product.digital:
-#                 order['shipping'] = True
-#
-#         except (ObjectDoesNotExist, ValueError):
-#             # El producto no existe o cantidad inválida: ignorar este item
-#             continue
-#
-#     return {'cartItems': cartItems, 'order': order, 'items': items}
-
-# store/utils.py
-
-# Asegúrate de que todas tus importaciones necesarias están aquí arriba
-# Por ejemplo:
-# from .models import Customer, Product, Order, OrderItem
-# from .utils import cookieCart # Si cookieCart está en otro archivo, aunque generalmente está en el mismo utils.py
 
 def cartData(request):
+    """
+    Función principal para obtener los datos del carrito, diferenciando
+    entre usuarios autenticados y no autenticados.
+    """
     if request.user.is_authenticated:
         # Lógica para usuarios autenticados
-        try:
-            # Intenta obtener el objeto Customer asociado al usuario
-            customer = request.user.customer
-        except Customer.DoesNotExist:
-            # Si el Customer no existe para este usuario (por ejemplo, es un usuario antiguo o un superusuario
-            # que se creó antes de implementar la lógica de Customer en el registro),
-            # lo creamos en este momento.
-            customer = Customer.objects.create(
-                user=request.user,
-                name=request.user.username, # Puedes ajustar esto si tienes un campo 'first_name' en tu User
-                email=request.user.email,
-            )
-            # No es estrictamente necesario llamar a .save() después de .create() ya que create() lo hace.
-            # Pero tampoco hace daño si lo pones.
+        customer, created_customer = Customer.objects.get_or_create(user=request.user)
+        if created_customer:
+            # Si el cliente fue recién creado, inicializa su nombre y email desde el usuario de Django
+            customer.name = request.user.username # O request.user.get_full_name() si lo usas
+            customer.email = request.user.email
+            customer.save()
+            print(f"DEBUG: cartData - Cliente creado para usuario autenticado: {customer.id}")
 
-        # A partir de aquí, el objeto 'customer' está garantizado para existir
-        # y el resto de tu lógica para usuarios autenticados puede continuar.
-
-        # Buscar el primer pedido incompleto, si no existe, crearlo
-        # Simplificado: get_or_create es más idiomático aquí
-        order, created = Order.objects.get_or_create(customer=customer, complete=False)
-
-
+        order, created_order = Order.objects.get_or_create(customer=customer, complete=False)
         items = order.orderitem_set.all()
-        cartItems = order.get_cart_items
+        cartItems = order.get_cart_items # Asume que Order tiene un @property get_cart_items
     else:
-        # Carrito para usuario no autenticado (desde cookies)
+        # Lógica para usuario no autenticado (desde cookies)
         cookieData = cookieCart(request)
         cartItems = cookieData['cartItems']
         order = cookieData['order']
@@ -151,50 +91,63 @@ def cartData(request):
     return {'cartItems': cartItems, 'order': order, 'items': items}
 
 
-# def cartData(request):
-#     if request.user.is_authenticated:
-#         customer = request.user.customer
-#
-#         # Buscar el primer pedido incompleto, si no existe, crearlo
-#         order = Order.objects.filter(customer=customer, complete=False).first()
-#         if order is None:
-#             order = Order.objects.create(customer=customer, complete=False)
-#
-#         items = order.orderitem_set.all()
-#         cartItems = order.get_cart_items
-#     else:
-#         # Carrito para usuario no autenticado (desde cookies)
-#         cookieData = cookieCart(request)
-#         cartItems = cookieData['cartItems']
-#         order = cookieData['order']
-#         items = cookieData['items']
-#
-#     return {'cartItems': cartItems, 'order': order, 'items': items}
-
-
 def guestOrder(request, data):
-    name = data['form']['name']
-    email = data['form']['email']
+    """
+    Gestiona la creación o recuperación de un Customer y una Order para usuarios invitados.
+    Asegura la reutilización de la Order incompleta para el mismo dispositivo.
+    """
+    name = data['form'].get('name', '').strip() # Obtener nombre del formulario
+    email = data['form'].get('email', '').strip() # Obtener email del formulario
 
-    cookieData = cookieCart(request)
-    items = cookieData['items']
+    # Obtener o crear un ID de dispositivo único para el usuario invitado
+    device = request.COOKIES.get('device')
+    if not device:
+        device = str(uuid.uuid4())
+        # La cookie 'device' se establecerá en la respuesta HTTP por un middleware o en la vista.
+        print(f"DEBUG: guestOrder - Nuevo ID de dispositivo generado: {device}")
 
-    customer, created = Customer.objects.get_or_create(email=email)
+    print(f"DEBUG: guestOrder - ID de dispositivo: {device}")
 
-    # ✅ Solo guardar el nombre si está vacío
-    if not customer.name:
+    # Obtener o crear el objeto Customer basado en el ID de dispositivo.
+    # Si ya existe un cliente con este dispositivo, se reutiliza.
+    customer, created_customer = Customer.objects.get_or_create(device=device)
+    print(f"DEBUG: guestOrder - Objeto Customer: ID {customer.id}, Creado: {created_customer}")
+
+    # Actualizar nombre y email del Customer con los datos del formulario.
+    # Esto es crucial para que los datos del formulario se asocien con el cliente invitado.
+    if customer.name != name or customer.email != email: # Solo guarda si hay cambios
         customer.name = name
+        customer.email = email
         customer.save()
+        print(f"DEBUG: guestOrder - Datos de Customer {customer.id} actualizados: {name}, {email}")
 
-    order = Order.objects.create(customer=customer, complete=False)
 
-    for item in items:
-        product = Product.objects.get(id=item['id'])
-        OrderItem.objects.create(
-            product=product,
+    # CRUCIAL: Intentar obtener una ORDEN INCOMPLETA existente para este cliente/dispositivo.
+    # Si existe, se reutiliza. Si no, se crea una nueva orden incompleta.
+    # Esto previene la duplicación de órdenes incompletas si el usuario invitado refresca la página
+    # o intenta el checkout varias veces antes de completar el pago.
+    order, created_order = Order.objects.get_or_create(customer=customer, complete=False)
+    print(f"DEBUG: guestOrder - Objeto Order: ID {order.id}, Creado: {created_order}, Completa: {order.complete}")
+
+    # Sincronizar los ítems del carrito de la cookie con los OrderItems de esta orden incompleta.
+    # Esto asegura que la orden en la BD refleje lo que el usuario tiene en su carrito de la cookie.
+    cookie_items = cookieCart(request)['items']
+
+    # Crear/actualizar OrderItems basados en el carrito de la cookie
+    for item_data in cookie_items:
+        product = Product.objects.get(id=item_data['product']['id'])
+        orderItem, created_order_item = OrderItem.objects.update_or_create(
             order=order,
-            quantity=item['quantity'],
+            product=product,
+            defaults={'quantity': item_data['quantity']} # Siempre actualiza la cantidad
         )
+        print(f"DEBUG: guestOrder - OrderItem para Product {product.id}: ID {orderItem.id}, Cantidad: {orderItem.quantity}, Creado: {created_order_item}")
+
+    # Opcional: Eliminar OrderItems de la BD que ya no están en el carrito de la cookie
+    # Esto limpia la orden si el usuario eliminó ítems de su carrito.
+    product_ids_in_cookie = [item['product']['id'] for item in cookie_items]
+    OrderItem.objects.filter(order=order).exclude(product__id__in=product_ids_in_cookie).delete()
+    print(f"DEBUG: guestOrder - OrderItems de la orden {order.id} sincronizados con la cookie.")
+
 
     return customer, order
-
