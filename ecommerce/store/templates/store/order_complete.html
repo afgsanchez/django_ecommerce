@@ -6,7 +6,6 @@
         <div class="col-lg-12">
             <div class="box-element p-4 text-center">
                 <h2>¡Gracias por tu compra!</h2>
-                <p>DEBUG: guest_access_token: {{ guest_access_token }} - user.is_authenticated: {{ request.user.is_authenticated }}</p> {# LÍNEA DE DEBUG TEMPORAL #}
                 <p>Tu pedido #{{ order.id }} ha sido procesado con éxito.</p>
 
                 {% if digital_order_items %}
@@ -42,11 +41,12 @@
                     <div class="col text-center">
                         {# CAMBIO CLAVE: Generar URL de impresión con guest_access_token si existe y no es usuario autenticado #}
                         {% if not request.user.is_authenticated and guest_access_token %}
+                            <p><b>¡Importante!, al ser un usuario no registrado, haz click en el botón de IMPRIMIR PEDIDO para obtener un enlace permanente y seguro con el fin de acceder a tu compra cuando lo desees.</b></p>
                             <a href="{% url 'order_print' order.id %}?guest_token={{ guest_access_token }}" target="_blank" class="btn btn-primary">
                         {% else %}
                             <a href="{% url 'order_print' order.id %}" target="_blank" class="btn btn-primary">
                         {% endif %}
-                            <i class="fa fa-print"></i> Imprimir Pedido / Factura
+                            <i class="fa fa-print"></i> Imprimir Pedido
                         </a>
                     </div>
                 </div>

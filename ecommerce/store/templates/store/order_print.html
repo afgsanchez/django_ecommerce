@@ -1,7 +1,8 @@
+{% load static %} {# <-- ¡CAMBIO CLAVE: MOVIDO AQUÍ! #}
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Datos de Pedido #{{ order.id }}</title>
+    <title>Detalle del Pedido #{{ order.id }}</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
         .invoice-box {
@@ -32,8 +33,7 @@
                     <table>
                         <tr>
                             <td class="title">
-                                {# Puedes poner aquí el logo de tu tienda si tienes uno #}
-                                <h1>Thing Store</h1>
+                                <img src="{% static 'images/ts.png' %}" style="width:100%; max-width:150px; height:auto; display:block; margin: 0 auto;" alt="Logo Tu Tienda">
                             </td>
                             <td>
                                 Pedido #: {{ order.id }}<br>
@@ -58,8 +58,8 @@
                                 {% endif %}
                             </td>
                             <td>
-                                Tu Tienda Online<br>
-                                info@tutienda.com<br>
+                                The Thing Store<br>
+                                info@thingstore.com<br>
                                 [Tu Número de Teléfono de Contacto]
                             </td>
                         </tr>
@@ -94,20 +94,18 @@
             <p style="margin-top: 20px; font-style: italic;">Este pedido está pendiente de gestión y será procesado en breve.</p>
         {% endif %}
 
-        {# --- BLOQUE CORREGIDO: URL PERSISTENTE PARA INVITADOS --- #}
         {% if not request.user.is_authenticated and guest_access_token %}
-            {% url 'order_complete' order.id as order_complete_path %} {# Genera la URL relativa base #}
+            {% url 'order_complete' order.id as order_complete_path %}
             {% comment %} Concatena el query parameter manualmente para la URL a mostrar {% endcomment %}
             {% with full_url_for_display=request.scheme|add:"://"|add:request.get_host|add:order_complete_path|add:"?guest_token="|add:guest_access_token %}
                 <p style="margin-top: 20px; font-size: 14px;">
-                    Para acceder a esta factura o a tus descargas más tarde, puedes usar el siguiente enlace (¡guárdalo bien!):<br>
+                    <b>Para acceder a esta factura o a tus descargas más tarde, puedes usar el siguiente enlace (¡guárdalo bien!):</b><br>
                     <a href="{{ order_complete_path }}?guest_token={{ guest_access_token }}" style="word-break: break-all;">
                         {{ full_url_for_display }}
                     </a>
                 </p>
             {% endwith %}
         {% endif %}
-        {# --- FIN BLOQUE CORREGIDO --- #}
 
         <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Imprimir esta página</button>
     </div>
