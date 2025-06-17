@@ -11,8 +11,7 @@
                 <p><strong>Nombre:</strong> {{ customer.name|default:request.user.username }}</p>
                 <p><strong>Email:</strong> {{ customer.email|default:request.user.email }}</p>
 
-                {# Puedes añadir un botón para editar perfil aquí más adelante si lo deseas #}
-                {# <a href="#" class="btn btn-outline-info">Editar Perfil</a> #}
+                <a href="{% url 'edit_profile' %}" class="btn btn-outline-info mt-3">Editar Perfil</a>
 
             </div>
             <br>

@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 import os
 import json
@@ -11,7 +12,7 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from wsgiref.util import FileWrapper
 from decimal import Decimal
-from .forms import CustomUserCreationForm
+from .forms import CustomUserCreationForm, ProfileEditForm # ¡Importar ProfileEditForm!
 from .models import Customer, Product, Order, OrderItem, ShippingAddress
 from .utils import cookieCart, cartData, guestOrder
 from django.contrib.auth import login
@@ -234,12 +235,9 @@ def completeOrder(request):
 
 # --- VISTAS DE CONFIRMACIÓN Y DESCARGA DE PEDIDOS ---
 
-def order_complete(request, order_id): # Eliminamos guest_token como argumento de ruta
+def order_complete(request, order_id):
     order = get_object_or_404(Order, id=order_id, complete=True)
-
-    # --- CAMBIO CLAVE: Obtener guest_token de request.GET ---
     guest_token = request.GET.get('guest_token')
-    # --- FIN CAMBIO CLAVE ---
 
     if request.user.is_authenticated:
         customer = request.user.customer
@@ -247,9 +245,7 @@ def order_complete(request, order_id): # Eliminamos guest_token como argumento d
             raise Http404("No tienes permiso para ver este pedido.")
     else:
         guest_order_id_in_session = request.session.get('guest_order_id')
-
         is_valid_by_session = (str(order.id) == str(guest_order_id_in_session))
-
         is_valid_by_token = False
         if guest_token and order.guest_access_token:
             try:
@@ -273,12 +269,9 @@ def order_complete(request, order_id): # Eliminamos guest_token como argumento d
     return render(request, 'store/order_complete.html', context)
 
 
-def order_print_view(request, order_id): # Eliminamos guest_token como argumento de ruta
+def order_print_view(request, order_id):
     order = get_object_or_404(Order, id=order_id, complete=True)
-
-    # --- CAMBIO CLAVE: Obtener guest_token de request.GET ---
     guest_token = request.GET.get('guest_token')
-    # --- FIN CAMBIO CLAVE ---
 
     if request.user.is_authenticated:
         customer = request.user.customer
@@ -286,9 +279,7 @@ def order_print_view(request, order_id): # Eliminamos guest_token como argumento
             raise Http404("No tienes permiso para ver este pedido.")
     else:
         guest_order_id_in_session = request.session.get('guest_order_id')
-
         is_valid_by_session = (str(order.id) == str(guest_order_id_in_session))
-
         is_valid_by_token = False
         if guest_token and order.guest_access_token:
             try:
@@ -310,7 +301,7 @@ def order_print_view(request, order_id): # Eliminamos guest_token como argumento
     return render(request, 'store/order_print.html', context)
 
 
-def download_file(request, token): # Eliminamos guest_token como argumento de ruta
+def download_file(request, token):
     try:
         order_item = get_object_or_404(
             OrderItem,
@@ -322,9 +313,7 @@ def download_file(request, token): # Eliminamos guest_token como argumento de ru
     except Exception as e:
         return JsonResponse({'error': f'Error al buscar el archivo: {e}'}, status=500)
 
-    # --- CAMBIO CLAVE: Obtener guest_token de request.GET ---
     guest_token = request.GET.get('guest_token')
-    # --- FIN CAMBIO CLAVE ---
 
     if not order_item.product or not order_item.product.has_digital_file:
         return HttpResponseForbidden("Este producto no es digital o el archivo no está disponible.")
@@ -335,7 +324,6 @@ def download_file(request, token): # Eliminamos guest_token como argumento de ru
     else:
         guest_order_id_in_session = request.session.get('guest_order_id')
         is_valid_by_session = (str(order_item.order.id) == str(guest_order_id_in_session))
-
         is_valid_by_token = False
         if guest_token and order_item.order.guest_access_token:
             try:
@@ -379,3 +367,30 @@ def profile(request):
         'orders': orders,
     }
     return render(request, 'store/profile.html', context)
+
+# --- NUEVA VISTA PARA EDITAR EL PERFIL ---
+@login_required
+def edit_profile(request):
+    user = request.user
+    customer = user.customer # Obtener la instancia de Customer asociada al usuario
+
+    if request.method == 'POST':
+        form = ProfileEditForm(request.POST, instance=user, customer_instance=customer)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '¡Tu perfil ha sido actualizado con éxito!') # Necesitarás importar messages
+            return redirect('profile') # Redirige al perfil principal
+        else:
+            messages.error(request, 'Ha ocurrido un error al actualizar tu perfil. Por favor, revisa los datos.')
+    else:
+        # Pre-llenar el formulario con los datos actuales del usuario y cliente
+        form = ProfileEditForm(instance=user, customer_instance=customer, initial={
+            'username': user.username,
+            'email': user.email,
+            'customer_name': customer.name,
+        })
+
+    context = {
+        'form': form
+    }
+    return render(request, 'store/edit_profile.html', context)

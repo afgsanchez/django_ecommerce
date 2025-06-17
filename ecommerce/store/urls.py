@@ -12,6 +12,6 @@ urlpatterns = [
     path('order_complete/<int:order_id>/', views.order_complete, name='order_complete'),
     path('order_print/<int:order_id>/', views.order_print_view, name='order_print'), # Nombre de la ruta: 'order_print'
     path('download_file/<uuid:token>/', views.download_file, name='download_file'), # Nombre de la ruta: 'download_file'
-    path('profile/', views.profile, name='profile')
-
+    path('profile/', views.profile, name='profile'),
+    path('profile/edit/', views.edit_profile, name='edit_profile'),
 ]
