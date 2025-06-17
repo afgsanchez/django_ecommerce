@@ -14,4 +14,8 @@ urlpatterns = [
     path('download_file/<uuid:token>/', views.download_file, name='download_file'), # Nombre de la ruta: 'download_file'
     path('profile/', views.profile, name='profile'),
     path('profile/edit/', views.edit_profile, name='edit_profile'),
+    # Ruta para productos por categoría: /store/electronica/
+    path('category/<slug:category_slug>/', views.store, name='products_by_category'),
+    # Ruta para productos por subcategoría: /store/electronica/smartphones/
+    path('category/<slug:category_slug>/<slug:subcategory_slug>/', views.store, name='products_by_subcategory'),
 ]

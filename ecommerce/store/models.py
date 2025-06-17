@@ -3,6 +3,9 @@ from django.contrib.auth.models import User
 import uuid # ¡Importa uuid para generar tokens únicos!
 from decimal import Decimal
 
+from django.urls import reverse
+
+
 # Create your models here.
 class Customer(models.Model):
     user = models.OneToOneField(User, null=True, blank=True, on_delete=models.CASCADE)
@@ -13,13 +16,53 @@ class Customer(models.Model):
     def __str__(self):
         return self.name if self.name else 'Cliente Anónimo' # Mejorar representación si name es None
 
+
+# --- NUEVOS MODELOS: Category y SubCategory ---
+class Category(models.Model):
+    name = models.CharField(max_length=200, unique=True, verbose_name="Nombre de Categoría")
+    slug = models.SlugField(max_length=200, unique=True, verbose_name="Slug (para URL)")
+
+    class Meta:
+        verbose_name = "Categoría"
+        verbose_name_plural = "Categorías"
+        ordering = ['name'] # Ordenar alfabéticamente por nombre
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        # URL para ver productos de esta categoría
+        return reverse('products_by_category', args=[self.slug])
+
+
+class SubCategory(models.Model):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories', verbose_name="Categoría Principal")
+    name = models.CharField(max_length=200, verbose_name="Nombre de Subcategoría")
+    slug = models.SlugField(max_length=200, verbose_name="Slug (para URL)")
+
+    class Meta:
+        verbose_name = "Subcategoría"
+        verbose_name_plural = "Subcategorías"
+        unique_together = ('category', 'slug') # Un slug debe ser único dentro de su categoría
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.category.name} - {self.name}"
+
+    def get_absolute_url(self):
+        # URL para ver productos de esta subcategoría
+        return reverse('products_by_subcategory', args=[self.category.slug, self.slug])
+
+
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    # Recomendación: Usar DecimalField para precios para evitar problemas de precisión con floats
-    price = models.DecimalField(max_digits=10, decimal_places=2) # Cambiado de FloatField a DecimalField
+    price = models.DecimalField(max_digits=10, decimal_places=2)
     digital = models.BooleanField(default=False, null=True, blank=True)
     image = models.ImageField(null=True, blank=True, upload_to='product_images/')
-    digital_file = models.FileField(upload_to='digital_products/', null=True, blank=True) # Campo para el archivo descargable
+    digital_file = models.FileField(upload_to='digital_products/', null=True, blank=True)
+
+    # Añadir campo de subcategoría al producto
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Subcategoría")
 
     def __str__(self):
         return self.name
@@ -28,14 +71,13 @@ class Product(models.Model):
     def imageURL(self):
         try:
             url = self.image.url
-        except ValueError: # Capturar ValueError si no hay archivo (en vez de un 'except' genérico)
+        except ValueError:
             url = ''
         return url
 
-    # Propiedad para verificar si el producto es digital y tiene un archivo asociado
     @property
     def has_digital_file(self):
-        return self.digital and bool(self.digital_file) # Usar bool() para verificar que el FileField no está vacío
+        return self.digital and bool(self.digital_file)
 
 
 class Order(models.Model):
