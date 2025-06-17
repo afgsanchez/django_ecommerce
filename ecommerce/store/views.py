@@ -347,3 +347,15 @@ def download_file(request, token):
         return JsonResponse({'error': 'File not found on server'}, status=404)
     except Exception as e:
         return JsonResponse({'error': f'Error al servir el archivo: {e}'}, status=500)
+
+@login_required # Solo usuarios autenticados pueden acceder a su perfil
+def profile(request):
+    customer = request.user.customer
+    # Obtener todas las órdenes completadas para este cliente, las más recientes primero
+    orders = Order.objects.filter(customer=customer, complete=True).order_by('-date_ordered')
+
+    context = {
+        'customer': customer, # Pasa el objeto customer al contexto
+        'orders': orders,     # Pasa las órdenes al contexto
+    }
+    return render(request, 'store/profile.html', context)

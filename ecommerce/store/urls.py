@@ -10,9 +10,8 @@ urlpatterns = [
     path('complete_order/', views.completeOrder, name="complete_order"),
     path('signup/', views.signup, name='signup'),
     path('order_complete/<int:order_id>/', views.order_complete, name='order_complete'),
-    # --- CAMBIOS CLAVE AQUÍ ---
     path('order_print/<int:order_id>/', views.order_print_view, name='order_print'), # Nombre de la ruta: 'order_print'
     path('download_file/<uuid:token>/', views.download_file, name='download_file'), # Nombre de la ruta: 'download_file'
-    # --- FIN CAMBIOS CLAVE ---
-    # Asegúrate de que no haya ninguna ruta a 'clear_guest_session' aquí, ya que la eliminamos de views.py.
+    path('profile/', views.profile, name='profile')
+
 ]
