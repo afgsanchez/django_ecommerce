@@ -105,24 +105,19 @@ def signup(request):
     return render(request, 'registration/signup.html', {'form': form})
 
 
-# --- NUEVO FLUJO DE PROCESAMIENTO DE PEDIDOS (VALIDACIÓN Y FINALIZACIÓN) ---
+# --- FLUJO DE PROCESAMIENTO DE PEDIDOS (VALIDACIÓN Y FINALIZACIÓN) ---
 
 @csrf_exempt
 def processOrder(request):
     data = json.loads(request.body)
-
-    print(f"DEBUG: processOrder - Datos recibidos (data) para VALIDACIÓN: {data}")
-
     customer = None
     order = None
 
     if request.user.is_authenticated:
         customer = request.user.customer
         order, created = Order.objects.get_or_create(customer=customer, complete=False)
-        print(f"DEBUG: processOrder - Usuario autenticado. Order ID: {order.id}, Creada: {created}")
     else:
         customer, order = guestOrder(request, data)
-        print(f"DEBUG: processOrder - Usuario NO autenticado. Order ID: {order.id}, (de guestOrder)")
 
     try:
         form_total = Decimal(data['form'].get('total', '0.00'))
@@ -130,7 +125,6 @@ def processOrder(request):
         return JsonResponse({'error': 'Total del formulario inválido'}, status=400)
 
     if form_total.quantize(Decimal('0.01')) != order.get_cart_total.quantize(Decimal('0.01')):
-        print(f"DEBUG: processOrder - Comparación de total fallida - Form: {form_total} vs Cart: {order.get_cart_total}")
         return JsonResponse({'error': 'Error de precios: El total no coincide. Pedido no procesado.'}, status=400)
 
     user_form_name = data['form'].get('name', '').strip()
@@ -169,7 +163,6 @@ def processOrder(request):
             customer.name = user_form_name
             customer.email = user_form_email
             customer.save()
-            print(f"DEBUG: processOrder - Customer {customer.id} datos actualizados desde formulario.")
 
     if order.shipping:
         ShippingAddress.objects.update_or_create(
@@ -183,11 +176,9 @@ def processOrder(request):
                 'phone_number': phone_number,
             }
         )
-        print(f"DEBUG: processOrder - ShippingAddress para Order {order.id} creada/actualizada.")
 
     if not request.user.is_authenticated:
         request.session['guest_order_id'] = str(order.id)
-        print(f"DEBUG: processOrder - ID de orden de invitado ({order.id}) establecido en sesión.")
 
     return JsonResponse({'message': 'Validación de pedido exitosa.', 'order_id': order.id}, status=200)
 
@@ -198,35 +189,34 @@ def completeOrder(request):
     order_id = data.get('order_id')
     paypal_transaction_id = data.get('paypal_transaction_id')
 
-    print(f"DEBUG: completeOrder - Datos recibidos: order_id={order_id}, paypal_transaction_id={paypal_transaction_id}")
-
     if not order_id or not paypal_transaction_id:
         return JsonResponse({'error': 'Faltan datos para finalizar el pedido.'}, status=400)
 
     try:
         order = Order.objects.get(id=order_id, complete=False)
-        print(f"DEBUG: completeOrder - Orden {order.id} encontrada y completa=False.")
 
         if request.user.is_authenticated:
             if order.customer != request.user.customer:
-                print(f"DEBUG: completeOrder - ACCESO NO AUTORIZADO (usuario autenticado).")
                 return JsonResponse({'error': 'Acceso no autorizado al pedido de usuario registrado.'}, status=403)
         else:
             guest_order_id_in_session = request.session.get('guest_order_id')
-            print(f"DEBUG: completeOrder - guest_order_id_in_session: {guest_order_id_in_session}")
             if str(guest_order_id_in_session) != str(order_id):
-                print(f"DEBUG: completeOrder - ACCESO NO AUTORIZADO (invitado). ID de sesión no coincide.")
                 return JsonResponse({'error': 'Acceso no autorizado a la orden de invitado.'}, status=403)
 
     except Order.DoesNotExist:
-        print(f"DEBUG: completeOrder - Pedido {order_id} no encontrado o ya completado.")
         return JsonResponse({'error': 'Pedido no encontrado o ya ha sido completado.'}, status=404)
 
     order.complete = True
     order.transaction_id = paypal_transaction_id
     order.date_ordered = timezone.now()
     order.save()
-    print(f"DEBUG: completeOrder - Orden {order.id} marcada como completa.")
+
+    guest_token_to_return = None
+    if not request.user.is_authenticated:
+        if not order.guest_access_token:
+            order.guest_access_token = uuid.uuid4()
+            order.save()
+        guest_token_to_return = str(order.guest_access_token)
 
     with transaction.atomic():
         for item in order.orderitem_set.all():
@@ -234,17 +224,22 @@ def completeOrder(request):
                 if not item.download_token:
                     item.download_token = uuid.uuid4()
                     item.save()
-                    print(f"DEBUG: completeOrder - Token de descarga para OrderItem {item.id} generado.")
 
-    # YA NO SE LIMPIA LA SESIÓN AQUÍ. Se mantiene para las vistas post-compra.
-
-    return JsonResponse({'message': 'Pedido completado con éxito', 'order_id': order.id}, status=200)
+    return JsonResponse({
+        'message': 'Pedido completado con éxito',
+        'order_id': order.id,
+        'guest_access_token': guest_token_to_return
+    }, status=200)
 
 
 # --- VISTAS DE CONFIRMACIÓN Y DESCARGA DE PEDIDOS ---
 
-def order_complete(request, order_id):
+def order_complete(request, order_id): # Eliminamos guest_token como argumento de ruta
     order = get_object_or_404(Order, id=order_id, complete=True)
+
+    # --- CAMBIO CLAVE: Obtener guest_token de request.GET ---
+    guest_token = request.GET.get('guest_token')
+    # --- FIN CAMBIO CLAVE ---
 
     if request.user.is_authenticated:
         customer = request.user.customer
@@ -252,19 +247,18 @@ def order_complete(request, order_id):
             raise Http404("No tienes permiso para ver este pedido.")
     else:
         guest_order_id_in_session = request.session.get('guest_order_id')
-        print(f"DEBUG: order_complete - Acceso de invitado. Order ID: {order_id}, Session ID: {guest_order_id_in_session}")
 
-        # La condición de acceso es crucial: si el ID de la URL coincide con el de la sesión
-        if str(order.id) != str(guest_order_id_in_session):
-            print(f"DEBUG: order_complete - Acceso no autorizado para invitado, ID no coincide.")
-            return redirect('store') # Redirige si la validación falla
+        is_valid_by_session = (str(order.id) == str(guest_order_id_in_session))
 
-        # --- ESTE BLOQUE FUE ELIMINADO EN LA VERSIÓN FINAL PARA MANTENER guest_order_id ---
-        # if 'guest_order_id' in request.session:
-        #     del request.session['guest_order_id']
-        #     print(f"DEBUG: order_complete - ID de orden de invitado ({order.id}) limpiado de la sesión.")
-        # --- FIN BLOQUE ELIMINADO ---
+        is_valid_by_token = False
+        if guest_token and order.guest_access_token:
+            try:
+                is_valid_by_token = (uuid.UUID(guest_token) == order.guest_access_token)
+            except ValueError:
+                is_valid_by_token = False
 
+        if not is_valid_by_session and not is_valid_by_token:
+            return redirect('store')
 
     digital_order_items = []
     for item in order.orderitem_set.all():
@@ -274,12 +268,17 @@ def order_complete(request, order_id):
     context = {
         'order': order,
         'digital_order_items': digital_order_items,
+        'guest_access_token': guest_token
     }
     return render(request, 'store/order_complete.html', context)
 
 
-def order_print_view(request, order_id):
+def order_print_view(request, order_id): # Eliminamos guest_token como argumento de ruta
     order = get_object_or_404(Order, id=order_id, complete=True)
+
+    # --- CAMBIO CLAVE: Obtener guest_token de request.GET ---
+    guest_token = request.GET.get('guest_token')
+    # --- FIN CAMBIO CLAVE ---
 
     if request.user.is_authenticated:
         customer = request.user.customer
@@ -287,10 +286,17 @@ def order_print_view(request, order_id):
             raise Http404("No tienes permiso para ver este pedido.")
     else:
         guest_order_id_in_session = request.session.get('guest_order_id')
-        print(f"DEBUG: order_print_view - Acceso de invitado. Order ID: {order_id}, Session ID: {guest_order_id_in_session}")
 
-        if str(order.id) != str(guest_order_id_in_session):
-            print(f"DEBUG: order_print_view - Acceso no autorizado para invitado, ID no coincide.")
+        is_valid_by_session = (str(order.id) == str(guest_order_id_in_session))
+
+        is_valid_by_token = False
+        if guest_token and order.guest_access_token:
+            try:
+                is_valid_by_token = (uuid.UUID(guest_token) == order.guest_access_token)
+            except ValueError:
+                is_valid_by_token = False
+
+        if not is_valid_by_session and not is_valid_by_token:
             return redirect('store')
 
     current_datetime = timezone.now()
@@ -299,11 +305,12 @@ def order_print_view(request, order_id):
         'order': order,
         'order_items': order.orderitem_set.all(),
         'current_datetime': current_datetime,
+        'guest_access_token': guest_token
     }
     return render(request, 'store/order_print.html', context)
 
 
-def download_file(request, token):
+def download_file(request, token): # Eliminamos guest_token como argumento de ruta
     try:
         order_item = get_object_or_404(
             OrderItem,
@@ -311,9 +318,13 @@ def download_file(request, token):
             order__complete=True,
         )
     except Http404:
-        raise Http404("Archivo no disponible o token inválido.")
+        raise Http404("Archivo no disponible o token de descarga inválido.")
     except Exception as e:
         return JsonResponse({'error': f'Error al buscar el archivo: {e}'}, status=500)
+
+    # --- CAMBIO CLAVE: Obtener guest_token de request.GET ---
+    guest_token = request.GET.get('guest_token')
+    # --- FIN CAMBIO CLAVE ---
 
     if not order_item.product or not order_item.product.has_digital_file:
         return HttpResponseForbidden("Este producto no es digital o el archivo no está disponible.")
@@ -323,8 +334,16 @@ def download_file(request, token):
             return HttpResponseForbidden("No tienes permiso para descargar este archivo.")
     else:
         guest_order_id_in_session = request.session.get('guest_order_id')
-        print(f"DEBUG: download_file - Acceso de invitado. Order ID: {order_item.order.id}, Session ID: {guest_order_id_in_session}")
-        if str(order_item.order.id) != str(guest_order_id_in_session):
+        is_valid_by_session = (str(order_item.order.id) == str(guest_order_id_in_session))
+
+        is_valid_by_token = False
+        if guest_token and order_item.order.guest_access_token:
+            try:
+                is_valid_by_token = (uuid.UUID(guest_token) == order_item.order.guest_access_token)
+            except ValueError:
+                is_valid_by_token = False
+
+        if not is_valid_by_session and not is_valid_by_token:
             return HttpResponseForbidden("Acceso no autorizado para esta descarga.")
 
     if not order_item.product.digital_file:
@@ -348,14 +367,15 @@ def download_file(request, token):
     except Exception as e:
         return JsonResponse({'error': f'Error al servir el archivo: {e}'}, status=500)
 
-@login_required # Solo usuarios autenticados pueden acceder a su perfil
+
+# --- VISTA PARA EL PERFIL DE USUARIO ---
+@login_required
 def profile(request):
     customer = request.user.customer
-    # Obtener todas las órdenes completadas para este cliente, las más recientes primero
     orders = Order.objects.filter(customer=customer, complete=True).order_by('-date_ordered')
 
     context = {
-        'customer': customer, # Pasa el objeto customer al contexto
-        'orders': orders,     # Pasa las órdenes al contexto
+        'customer': customer,
+        'orders': orders,
     }
     return render(request, 'store/profile.html', context)

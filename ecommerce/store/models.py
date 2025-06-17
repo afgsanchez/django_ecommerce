@@ -45,6 +45,7 @@ class Order(models.Model):
     complete = models.BooleanField(default=False, verbose_name="PAYMENT COMPLETED")
     transaction_id = models.CharField(max_length=100, null=True)
     is_processed = models.BooleanField(default=False, verbose_name="PEDIDO GESTIONADO")
+    guest_access_token = models.UUIDField(null=True, blank=True, unique=True)
 
     def __str__(self):
         return str(self.id)

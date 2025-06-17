@@ -81,151 +81,155 @@
 	<script src="https://www.paypal.com/sdk/js?client-id=ASWRlLR2zxBtvTy1_AY7pOkUg2KxrL21CpJh7-vHLZf2aWcX3WgZ8QkxkoOA7X380ARHS2Cuyra1cM6m&currency=EUR"></script>
 
 	<script type="text/javascript">
-	// Variables de contexto de Django
-var shipping = '{{order.shipping|yesno:"True,False"}}';
-var total = '{{order.get_cart_total|floatformat:2}}';
-var user = '{{request.user.is_authenticated|yesno:"True,False"}}';
-var csrftoken = '{{ csrf_token }}';
+			// Variables de contexto de Django
+		var shipping = '{{order.shipping|yesno:"True,False"}}';
+		var total = '{{order.get_cart_total|floatformat:2}}';
+		var user = '{{request.user.is_authenticated|yesno:"True,False"}}';
+		var csrftoken = '{{ csrf_token }}';
 
-// Lógica para ocultar/mostrar secciones
-if (shipping == 'False'){
-   document.getElementById('shipping-info').innerHTML = '';
-}
+		// Lógica para ocultar/mostrar secciones
+		if (shipping == 'False'){
+		   document.getElementById('shipping-info').innerHTML = '';
+		}
 
-// Este bloque oculta el formulario COMPLETO si el usuario está logueado Y solo compra digital
-if (shipping == 'False' && user == 'True'){
-   document.getElementById('form-wrapper').classList.add("hidden");
-   document.getElementById('payment-info').classList.remove("hidden");
-}
+		// Este bloque oculta el formulario COMPLETO si el usuario está logueado Y solo compra digital
+		if (shipping == 'False' && user == 'True'){
+		   document.getElementById('form-wrapper').classList.add("hidden");
+		   document.getElementById('payment-info').classList.remove("hidden");
+		}
 
-var form = document.getElementById('form'); // Referencia al formulario principal
-form.addEventListener('submit', function(e){
-   e.preventDefault();
-   console.log('Formulario enviado (solo para mostrar PayPal)...');
-   document.getElementById('form-button').classList.add("hidden");
-   document.getElementById('payment-info').classList.remove("hidden");
-});
+		var form = document.getElementById('form'); // Referencia al formulario principal
+		form.addEventListener('submit', function(e){
+		   e.preventDefault();
+		   console.log('Formulario enviado (solo para mostrar PayPal)...');
+		   document.getElementById('form-button').classList.add("hidden");
+		   document.getElementById('payment-info').classList.remove("hidden");
+		});
 
-// Función 1: Para validar los datos del pedido en el backend y obtener el order_id
-function validateOrderAndGetId() {
-    console.log('Paso 1: Validando datos del pedido en el backend...');
-    var userName = document.querySelector('input[name="name"]').value;
-    var userEmail = document.querySelector('input[name="email"]').value;
+		// Función 1: Para validar los datos del pedido en el backend y obtener el order_id
+		function validateOrderAndGetId() {
+			console.log('Paso 1: Validando datos del pedido en el backend...');
+			var userName = document.querySelector('input[name="name"]').value;
+			var userEmail = document.querySelector('input[name="email"]').value;
 
-    var userFormData = {
-        'name': userName,
-        'email': userEmail,
-        'total': total,
-    };
+			var userFormData = {
+				'name': userName,
+				'email': userEmail,
+				'total': total,
+			};
 
-    var shippingInfo = {
-        'address': '', 'city': '', 'state': '', 'zipcode': '', 'phone_number': '',
-    };
+			var shippingInfo = {
+				'address': '', 'city': '', 'state': '', 'zipcode': '', 'phone_number': '',
+			};
 
-    if (shipping == 'True') {
-        shippingInfo.address = document.querySelector('input[name="address"]').value;
-        shippingInfo.city = document.querySelector('input[name="city"]').value;
-        shippingInfo.state = document.querySelector('input[name="state"]').value;
-        shippingInfo.zipcode = document.querySelector('input[name="zipcode"]').value;
-        shippingInfo.phone_number = document.querySelector('input[name="phone_number"]').value;
-    }
+			if (shipping == 'True') {
+				shippingInfo.address = document.querySelector('input[name="address"]').value;
+				shippingInfo.city = document.querySelector('input[name="city"]').value;
+				shippingInfo.state = document.querySelector('input[name="state"]').value;
+				shippingInfo.zipcode = document.querySelector('input[name="zipcode"]').value;
+				shippingInfo.phone_number = document.querySelector('input[name="phone_number"]').value;
+			}
 
-    var url = "/process_order/";
-    return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-        body: JSON.stringify({'form': userFormData, 'shipping': shippingInfo}),
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(errorData => {
-                throw new Error(errorData.error || 'Error de validación del pedido.');
-            });
-        }
-        return response.json();
-    });
-}
+			var url = "/process_order/";
+			return fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+				body: JSON.stringify({'form': userFormData, 'shipping': shippingInfo}),
+			})
+			.then(response => {
+				if (!response.ok) {
+					return response.json().then(errorData => {
+						throw new Error(errorData.error || 'Error de validación del pedido.');
+					});
+				}
+				return response.json();
+			});
+		}
 
-// Función 2: Para completar la orden en el backend después de que PayPal haya capturado el pago
-function completeOrderOnBackend(orderId, paypalTransactionId) {
-    console.log('Paso 4: Completando pedido en el backend después de PayPal capture...');
-    var url = "/complete_order/";
-    return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-        body: JSON.stringify({ 'order_id': orderId, 'paypal_transaction_id': paypalTransactionId }),
-    })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(errorData => {
-                throw new Error(errorData.error || 'Error al finalizar el pedido en el servidor.');
-            });
-        }
-        return response.json();
-    });
-}
+		// Función 2: Para completar la orden en el backend después de que PayPal haya capturado el pago
+		function completeOrderOnBackend(orderId, paypalTransactionId) {
+			console.log('Paso 4: Completando pedido en el backend después de PayPal capture...');
+			var url = "/complete_order/";
+			return fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+				body: JSON.stringify({ 'order_id': orderId, 'paypal_transaction_id': paypalTransactionId }),
+			})
+			.then(response => {
+				if (!response.ok) {
+					return response.json().then(errorData => {
+						throw new Error(errorData.error || 'Error al finalizar el pedido en el servidor.');
+					});
+				}
+				return response.json();
+			});
+		}
 
-// --- INTEGRACIÓN CON LOS BOTONES DE PAYPAL ---
-window.onload = function() {
-    paypal.Buttons({
-        createOrder: function(data, actions) {
-            console.log('Paso 2: Creando orden en PayPal...');
-            return actions.order.create({
-                purchase_units: [{ amount: { value: total, currency_code: 'EUR' } }]
-            });
-        },
-        onApprove: function(data, actions) {
-            let backendOrderId = null;
-            console.log('Paso 3: PayPal autorizado. Validando pedido en Django antes de capturar...');
+		// --- INTEGRACIÓN CON LOS BOTONES DE PAYPAL ---
+		window.onload = function() {
+			paypal.Buttons({
+				createOrder: function(data, actions) {
+					console.log('Paso 2: Creando orden en PayPal...');
+					return actions.order.create({
+						purchase_units: [{ amount: { value: total, currency_code: 'EUR' } }]
+					});
+				},
+				onApprove: function(data, actions) {
+					let backendOrderId = null;
+					console.log('Paso 3: PayPal autorizado. Validando pedido en Django antes de capturar...');
 
-            return validateOrderAndGetId()
-                .then(backendResponse => {
-                    backendOrderId = backendResponse.order_id;
-                    console.log('Validación de Django exitosa. Order ID:', backendOrderId);
-                    console.log('Paso 4: Validación OK, capturando pago con PayPal...');
-                    return actions.order.capture();
-                })
-                .then(paypalCaptureDetails => {
-                    console.log('Paso 5: PayPal capture exitoso. Finalizando orden en Django...');
-                    const paypalTransactionId = paypalCaptureDetails.id;
-                    return completeOrderOnBackend(backendOrderId, paypalTransactionId);
-                })
-                .then(finalBackendResponse => {
-                    console.log('Paso 6: Pedido completado con éxito en el backend:', finalBackendResponse);
-                    alert('¡Pago completado y pedido procesado con éxito!');
+					return validateOrderAndGetId()
+						.then(backendResponse => {
+							backendOrderId = backendResponse.order_id;
+							console.log('Validación de Django exitosa. Order ID:', backendOrderId);
+							console.log('Paso 4: Validación OK, capturando pago con PayPal...');
+							return actions.order.capture();
+						})
+						.then(paypalCaptureDetails => {
+							console.log('Paso 5: PayPal capture exitoso. Finalizando orden en Django...');
+							const paypalTransactionId = paypalCaptureDetails.id;
+							return completeOrderOnBackend(backendOrderId, paypalTransactionId);
+						})
+						.then(finalBackendResponse => {
+							console.log('Paso 6: Pedido completado con éxito en el backend:', finalBackendResponse);
+							alert('¡Pago completado y pedido procesado con éxito!');
 
-                    cart = {};
-                    document.cookie = 'cart=' + JSON.stringify(cart) + ";domain=;path=/";
+							cart = {};
+							document.cookie = 'cart=' + JSON.stringify(cart) + ";domain=;path=/";
 
-                    // --- CAMBIO CLAVE AQUÍ: Redirigimos directamente ---
-                    if (finalBackendResponse && finalBackendResponse.order_id) {
-                        window.location.href = "{% url 'order_complete' 0 %}".replace('0', finalBackendResponse.order_id);
-                    } else {
-                        window.location.href = "{% url 'store' %}";
-                    }
-                    // --- FIN CAMBIO CLAVE ---
-                })
-                .catch(error => {
-                    console.error('Error durante el proceso de pago o finalización:', error);
-                    alert(error.message || 'Ocurrió un error inesperado durante el pago. Por favor, inténtalo de nuevo.');
-                    document.getElementById('form-button').classList.remove("hidden");
-                    document.getElementById('payment-info').classList.add("hidden");
-                });
-        },
-        onCancel: function(data) {
-            console.log('Pago cancelado por el usuario');
-            alert('Pago cancelado. Puedes intentar de nuevo.');
-            document.getElementById('form-button').classList.remove("hidden");
-            document.getElementById('payment-info').classList.add("hidden");
-        },
-        onError: function(err) {
-            console.error('Error general de PayPal SDK:', err);
-            alert('Un error ocurrió con PayPal: ' + err.message);
-            document.getElementById('form-button').classList.remove("hidden");
-            document.getElementById('payment-info').classList.add("hidden");
-        }
-    }).render('#paypal-button-container');
-};
+							// --- CAMBIO CLAVE AQUÍ: Propagar el guest_access_token si existe ---
+							if (finalBackendResponse && finalBackendResponse.order_id) {
+								let redirectUrl = "{% url 'order_complete' 0 %}".replace('0', finalBackendResponse.order_id);
+								if (user === 'False' && finalBackendResponse.guest_access_token) {
+									redirectUrl += `?guest_token=${finalBackendResponse.guest_access_token}`;
+								}
+								window.location.href = redirectUrl;
+							} else {
+								window.location.href = "{% url 'store' %}";
+							}
+							// --- FIN CAMBIO CLAVE ---
+						})
+						.catch(error => {
+							console.error('Error durante el proceso de pago o finalización:', error);
+							alert(error.message || 'Ocurrió un error inesperado durante el pago. Por favor, inténtalo de nuevo.');
+							document.getElementById('form-button').classList.remove("hidden");
+							document.getElementById('payment-info').classList.add("hidden");
+						});
+				},
+				onCancel: function(data) {
+					console.log('Pago cancelado por el usuario');
+					alert('Pago cancelado. Puedes intentar de nuevo.');
+					document.getElementById('form-button').classList.remove("hidden");
+					document.getElementById('payment-info').classList.add("hidden");
+				},
+				onError: function(err) {
+					console.error('Error general de PayPal SDK:', err);
+					alert('Un error ocurrió con PayPal: ' + err.message);
+					document.getElementById('form-button').classList.remove("hidden");
+					document.getElementById('payment-info').classList.add("hidden");
+				}
+			}).render('#paypal-button-container');
+		};
 	</script>
 
 {% endblock content %}

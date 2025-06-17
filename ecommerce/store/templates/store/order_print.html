@@ -1,123 +1,115 @@
-{# ecommerce/store/templates/store/order_print.html #}
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedido #{{ order.id }} - Imprimir</title>
+    <title>Datos de Pedido #{{ order.id }}</title>
     <style>
-        /* CSS básico para impresión */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20mm; /* Márgenes para impresión */
-            color: #333;
+        body { font-family: sans-serif; margin: 20px; }
+        .invoice-box {
+            max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee;
+            box-shadow: 0 0 10px rgba(0, 0, 0, .15); font-size: 16px; line-height: 24px; color: #555;
         }
-        h1, h2, h3 {
-            color: #222;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .text-right {
-            text-align: right;
-        }
-        .no-print {
-            display: none; /* Elementos con esta clase no se imprimirán */
-        }
-        @media print {
-            /* Reglas específicas para cuando se imprime */
-            body {
-                margin: 0;
-                padding: 0;
-            }
-            .no-print {
-                display: none !important;
-            }
-        }
+        .invoice-box table { width: 100%; line-height: inherit; text-align: left; border-collapse: collapse; }
+        .invoice-box table td { padding: 5px; vertical-align: top; }
+        .invoice-box table tr td:nth-child(2) { text-align: right; }
+        .invoice-box table tr.top table td { padding-bottom: 20px; }
+        .invoice-box table tr.top table td.title { font-size: 45px; line-height: 45px; color: #333; }
+        .invoice-box table tr.information table td { padding-bottom: 35px; }
+        .invoice-box table tr.heading td { background: #eee; border-bottom: 1px solid #ddd; font-weight: bold; }
+        .invoice-box table tr.details td { padding-bottom: 20px; }
+        .invoice-box table tr.item td { border-bottom: 1px solid #eee; }
+        .invoice-box table tr.item.last td { border-bottom: none; }
+        .invoice-box table tr.total td:nth-child(2) { border-top: 2px solid #eee; font-weight: bold; }
+        .invoice-box .item-total { text-align: right; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Pedido #{{ order.id }}</h1>
-        <p><strong>Fecha del Pedido:</strong> {{ order.date_ordered|date:"d/m/Y H:i" }}</p>
-        <p><strong>ID de Transacción:</strong> {{ order.transaction_id }}</p>
-
-        <h2>Información del Cliente</h2>
-        <p><strong>Nombre:</strong> {{ order.customer.name }}</p>
-        <p><strong>Email:</strong> {{ order.customer.email }}</p>
-
-        {% if order.shipping %}
-        <h2>Dirección de Envío</h2>
-        {% comment %}
-            Asumiendo que tienes un método o relación para obtener la dirección de envío del pedido.
-            Podría ser order.shippingaddress_set.first para el primer (y único) ShippingAddress.
-            Si no lo tienes, deberías añadirlo a tu modelo Order o pasar el objeto ShippingAddress
-            directamente desde la vista.
-        {% endcomment %}
-        {% with shipping_address=order.shippingaddress_set.first %}
-            {% if shipping_address %}
-                <p><strong>Dirección:</strong> {{ shipping_address.address }}</p>
-                <p><strong>Ciudad:</strong> {{ shipping_address.city }}</p>
-                <p><strong>Estado:</strong> {{ shipping_address.state }}</p>
-                <p><strong>Código Postal:</strong> {{ shipping_address.zipcode }}</p>
-            {% else %}
-                <p>No se encontró dirección de envío.</p>
-            {% endif %}
-        {% endwith %}
-        {% endif %}
-
-
-        <h2>Detalles del Pedido</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Producto</th>
-                    <th class="text-right">Precio Unitario</th>
-                    <th class="text-right">Cantidad</th>
-                    <th class="text-right">Total Ítem</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in order_items %}
-                <tr>
-                    <td>{{ item.product.name }}</td>
-                    <td class="text-right">€{{ item.product.price|floatformat:2 }}</td>
-                    <td class="text-right">{{ item.quantity }}</td>
-                    <td class="text-right">€{{ item.get_total|floatformat:2 }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="3" class="text-right"><strong>Total del Pedido:</strong></td>
-                    <td class="text-right"><strong>€{{ order.get_cart_total|floatformat:2 }}</strong></td>
-                </tr>
-            </tfoot>
+    <div class="invoice-box">
+        <table cellpadding="0" cellspacing="0">
+            <tr class="top">
+                <td colspan="2">
+                    <table>
+                        <tr>
+                            <td class="title">
+                                {# Puedes poner aquí el logo de tu tienda si tienes uno #}
+                                <h1>Thing Store</h1>
+                            </td>
+                            <td>
+                                Pedido #: {{ order.id }}<br>
+                                Creado: {{ current_datetime|date:"d M Y" }}<br>
+                                Fecha de Pedido: {{ order.date_ordered|date:"d M Y H:i" }}
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr class="information">
+                <td colspan="2">
+                    <table>
+                        <tr>
+                            <td>
+                                {% if order.customer.name %}{{ order.customer.name }}{% else %}Cliente Anónimo{% endif %}<br>
+                                {% if order.customer.email %}{{ order.customer.email }}{% endif %}<br>
+                                {% if order.shipping_address %}
+                                    {{ order.shipping_address.address }}<br>
+                                    {{ order.shipping_address.city }}, {{ order.shipping_address.state }} {{ order.shipping_address.zipcode }}<br>
+                                    {{ order.shipping_address.phone_number }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                Tu Tienda Online<br>
+                                info@tutienda.com<br>
+                                [Tu Número de Teléfono de Contacto]
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr class="heading">
+                <td>Producto</td>
+                <td class="text-right">Precio Unitario</td>
+                <td class="text-right">Cantidad</td>
+                <td class="text-right">Total</td>
+            </tr>
+            {% for item in order_items %}
+            <tr class="item {% if forloop.last %}last{% endif %}">
+                <td class="text-left">{{ item.product.name }}</td>
+                <td class="text-right">€ {{ item.product.price|floatformat:2 }}</td>
+                <td class="text-right">{{ item.quantity }}</td>
+                <td class="text-right">€ {{ item.get_total|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="text-right">Total: € {{ order.get_cart_total|floatformat:2 }}</td>
+            </tr>
         </table>
 
-        <p style="margin-top: 30px;">Gracias por tu compra.</p>
-        <p style="font-size: 0.8em; color: #666;">Generado el {{ current_datetime|date:"d/m/Y H:i" }}</p>
-    </div>
+        {% if order.is_processed %}
+            <p style="margin-top: 20px; font-style: italic;">Este pedido ha sido marcado como gestionado.</p>
+        {% else %}
+            <p style="margin-top: 20px; font-style: italic;">Este pedido está pendiente de gestión y será procesado en breve.</p>
+        {% endif %}
 
-    {# Script para imprimir automáticamente al cargar la página #}
-    <script>
-        window.onload = function() {
-            window.print();
-            // Opcional: Cerrar la ventana después de imprimir si fue abierta en una nueva pestaña/ventana
-            // window.onafterprint = function() {
-            //     window.close();
-            // }
-        };
-    </script>
+        {# --- BLOQUE CORREGIDO: URL PERSISTENTE PARA INVITADOS --- #}
+        {% if not request.user.is_authenticated and guest_access_token %}
+            {% url 'order_complete' order.id as order_complete_path %} {# Genera la URL relativa base #}
+            {% comment %} Concatena el query parameter manualmente para la URL a mostrar {% endcomment %}
+            {% with full_url_for_display=request.scheme|add:"://"|add:request.get_host|add:order_complete_path|add:"?guest_token="|add:guest_access_token %}
+                <p style="margin-top: 20px; font-size: 14px;">
+                    Para acceder a esta factura o a tus descargas más tarde, puedes usar el siguiente enlace (¡guárdalo bien!):<br>
+                    <a href="{{ order_complete_path }}?guest_token={{ guest_access_token }}" style="word-break: break-all;">
+                        {{ full_url_for_display }}
+                    </a>
+                </p>
+            {% endwith %}
+        {% endif %}
+        {# --- FIN BLOQUE CORREGIDO --- #}
+
+        <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; cursor: pointer;">Imprimir esta página</button>
+    </div>
 </body>
 </html>
