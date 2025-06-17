@@ -1,4 +1,3 @@
-from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 import os
 import json
@@ -10,10 +9,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse, FileResponse, HttpResponseForbidden, Http404
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages  # Importar messages
 from wsgiref.util import FileWrapper
 from decimal import Decimal
-from .forms import CustomUserCreationForm, ProfileEditForm # ¡Importar ProfileEditForm!
-from .models import Customer, Product, Order, OrderItem, ShippingAddress
+from .forms import CustomUserCreationForm, ProfileEditForm
+from .models import Customer, Product, Order, OrderItem, ShippingAddress, Category, \
+    SubCategory  # Importar Category y SubCategory
 from .utils import cookieCart, cartData, guestOrder
 from django.contrib.auth import login
 import re
@@ -22,12 +23,42 @@ from django.utils import timezone
 
 # --- VISTAS GENERALES DE LA TIENDA ---
 
-def store(request):
+# Modificamos la vista 'store' para que acepte slugs de categoría y subcategoría
+def store(request, category_slug=None, subcategory_slug=None):
     data = cartData(request)
     cartItems = data['cartItems']
     order = data['order']
-    products = Product.objects.all()
-    context = {'products': products, 'cartItems': cartItems}
+
+    products = Product.objects.all()  # Empezamos con todos los productos
+    selected_category = None
+    selected_subcategory = None
+
+    # Filtrar por subcategoría si se proporciona un subcategory_slug
+    if subcategory_slug:
+        selected_subcategory = get_object_or_404(SubCategory, slug=subcategory_slug)
+        products = products.filter(subcategory=selected_subcategory)
+        selected_category = selected_subcategory.category  # Asegurarse de tener también la categoría principal
+    # Si no hay subcategoría, pero sí categoría, filtrar por categoría
+    elif category_slug:
+        selected_category = get_object_or_404(Category, slug=category_slug)
+        # Filtra productos cuyas subcategorías pertenezcan a la categoría seleccionada
+        products = products.filter(subcategory__category=selected_category)
+
+    # Obtener todas las categorías y subcategorías para la navegación
+    categories = Category.objects.all().order_by('name')
+    # Para mostrar subcategorías solo de la categoría seleccionada si aplica
+    subcategories = []
+    if selected_category:
+        subcategories = selected_category.subcategories.all().order_by('name')
+
+    context = {
+        'products': products,
+        'cartItems': cartItems,
+        'selected_category': selected_category,  # Para resaltar la categoría activa en la plantilla
+        'selected_subcategory': selected_subcategory,  # Para resaltar la subcategoría activa
+        'categories': categories,  # Todas las categorías para la navegación principal
+        'subcategories': subcategories,  # Subcategorías de la categoría seleccionada (o vacía)
+    }
     return render(request, 'store/store.html', context)
 
 
@@ -153,11 +184,14 @@ def processOrder(request):
         }
         for field_name, value in required_shipping_fields.items():
             if not value:
-                return JsonResponse({'error': f'El campo "{field_name}" es obligatorio para este pedido con envío.'}, status=400)
+                return JsonResponse({'error': f'El campo "{field_name}" es obligatorio para este pedido con envío.'},
+                                    status=400)
 
         phone_regex = r'^\+?[\d\s-]{7,20}$'
         if not re.fullmatch(phone_regex, phone_number):
-            return JsonResponse({'error': 'El "Número de Teléfono" no tiene un formato válido. Debe contener solo números, espacios o guiones, y tener una longitud razonable.'}, status=400)
+            return JsonResponse({
+                                    'error': 'El "Número de Teléfono" no tiene un formato válido. Debe contener solo números, espacios o guiones, y tener una longitud razonable.'},
+                                status=400)
 
     if customer:
         if customer.name != user_form_name or customer.email != user_form_email:
@@ -368,18 +402,19 @@ def profile(request):
     }
     return render(request, 'store/profile.html', context)
 
+
 # --- NUEVA VISTA PARA EDITAR EL PERFIL ---
 @login_required
 def edit_profile(request):
     user = request.user
-    customer = user.customer # Obtener la instancia de Customer asociada al usuario
+    customer = user.customer  # Obtener la instancia de Customer asociada al usuario
 
     if request.method == 'POST':
         form = ProfileEditForm(request.POST, instance=user, customer_instance=customer)
         if form.is_valid():
             form.save()
-            messages.success(request, '¡Tu perfil ha sido actualizado con éxito!') # Necesitarás importar messages
-            return redirect('profile') # Redirige al perfil principal
+            messages.success(request, '¡Tu perfil ha sido actualizado con éxito!')
+            return redirect('profile')  # Redirige al perfil principal
         else:
             messages.error(request, 'Ha ocurrido un error al actualizar tu perfil. Por favor, revisa los datos.')
     else:

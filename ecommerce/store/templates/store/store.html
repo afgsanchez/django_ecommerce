@@ -1,23 +1,64 @@
 {% extends 'store/main.html' %}
-{% block title %}Home{% endblock title %}
+{% block title %}Productos{% endblock title %}
 {% load static %}
 {% block content %}
     <div class="row">
-        {% for product in products %}
-        <div class="col-lg-4">
-            <img class="thumbnail" src="{{product.imageURL}}">
-            <div class="box-element product">
-                <h6><strong>{{product.name}}</strong></h6>
-                <hr>
-
-                <button data-product="{{product.id}}" data-action="add" class="btn btn-outline-secondary add-btn update-cart">Add to Cart</button>
-                <a class="btn btn-outline-success" href="#">View</a>
-                <h4 style="display: inline-block; float: right"><strong>€ {{product.price|floatformat:2}}</strong></h4>
-
+        {# Barra lateral para categorías y subcategorías #}
+        <div class="col-lg-3 col-md-4">
+            <div class="box-element p-3 mb-4">
+                <h4 class="mb-3">Categorías</h4>
+                <ul class="list-group list-group-flush">
+                    {# Enlace para ver todos los productos #}
+                    <li class="list-group-item {% if not selected_category %}active{% endif %}">
+                        <a href="{% url 'store' %}" class="text-decoration-none text-dark">
+                            Todos los Productos
+                        </a>
+                    </li>
+                    {% for cat in categories %}
+                        <li class="list-group-item {% if selected_category and selected_category.slug == cat.slug %}active{% endif %}">
+                            <a href="{% url 'products_by_category' cat.slug %}" class="text-decoration-none text-dark">
+                                {{ cat.name }}
+                            </a>
+                            {# Mostrar subcategorías si esta categoría está seleccionada o si hay subcategorías globales (opcional) #}
+                            {% if selected_category and selected_category.slug == cat.slug and subcategories %}
+                                <ul class="list-group list-group-flush mt-2">
+                                    {% for subcat in subcategories %}
+                                        <li class="list-group-item list-group-item-action {% if selected_subcategory and selected_subcategory.slug == subcat.slug %}active{% endif %}">
+                                            <a href="{% url 'products_by_subcategory' cat.slug subcat.slug %}" class="text-decoration-none text-dark">
+                                                - {{ subcat.name }}
+                                            </a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
             </div>
         </div>
-        {% endfor %}
 
+        {# Contenido principal para productos #}
+        <div class="col-lg-9 col-md-8">
+            <div class="row">
+                {% for product in products %}
+                    <div class="col-lg-4 col-md-6 col-sm-6 mb-4">
+                        <div class="box-element product-item">
+                            <img class="thumbnail" src="{{ product.imageURL }}">
+                            <div class="product-info">
+                                <h6><strong>{{ product.name }}</strong></h6>
+                                <hr>
+                                <h4 style="display: inline-block; float: right"><strong>€ {{ product.price|floatformat:2 }}</strong></h4>
+                                <button data-product="{{ product.id }}" data-action="add" class="btn btn-outline-secondary add-btn update-cart">Añadir al Carrito</button>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="col-12 text-center mt-5">
+                        <p class="lead">No hay productos disponibles en esta sección.</p>
+                        <a href="{% url 'store' %}" class="btn btn-primary mt-3">Ver todos los productos</a>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
     </div>
-
 {% endblock content %}
