@@ -50,7 +50,7 @@
                                 <td>
                                     <a href="{% url 'order_complete' order.id %}" class="btn btn-sm btn-outline-info">Ver Detalles</a>
                                     {% if order.shipping %} {# Solo mostrar el botón de imprimir para pedidos con envío si lo deseas #}
-                                        <a href="{% url 'order_print' order.id %}" target="_blank" class="btn btn-sm btn-outline-secondary">Imprimir Factura</a>
+                                        <a href="{% url 'order_print' order.id %}" target="_blank" class="btn btn-sm btn-outline-secondary">Imprimir Pedido</a>
                                     {% endif %}
                                     {% for item in order.orderitem_set.all %}
                                         {% if item.product.digital and item.download_token %}
