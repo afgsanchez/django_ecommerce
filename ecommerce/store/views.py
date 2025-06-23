@@ -12,13 +12,15 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages  # Importar messages
 from wsgiref.util import FileWrapper
 from decimal import Decimal
-from .forms import CustomUserCreationForm, ProfileEditForm
+from .forms import CustomUserCreationForm, ProfileEditForm, MensajeForm
 from .models import Customer, Product, Order, OrderItem, ShippingAddress, Category, \
     SubCategory  # Importar Category y SubCategory
 from .utils import cookieCart, cartData, guestOrder
 from django.contrib.auth import login
 import re
 from django.utils import timezone
+
+
 
 
 # --- VISTAS GENERALES DE LA TIENDA ---
@@ -433,3 +435,24 @@ def edit_profile(request):
         'form': form
     }
     return render(request, 'store/edit_profile.html', context)
+
+# store/views.py
+
+
+
+def contact_view(request):
+    if request.method == 'POST':
+        form = MensajeForm(request.POST)
+        if form.is_valid():
+            form.save()
+            # --- AQUÍ AÑADIMOS EL MENSAJE DE ÉXITO ---
+            messages.success(request, '¡Gracias! Hemos recibido tu mensaje y nos pondremos en contacto contigo muy pronto.')
+            return redirect('contact') # Redirigimos a la misma URL de contacto para que el mensaje se muestre.
+                                       # Si rediriges a 'home', el mensaje también se mostrará en 'home'.
+                                       # Decide dónde quieres que aparezca la confirmación.
+        else:
+            # --- Y AQUÍ UN MENSAJE DE ERROR POR SI ALGO FALLA ---
+            messages.error(request, 'Hubo un problema al enviar tu mensaje. Por favor, revisa los campos y inténtalo de nuevo.')
+    else:
+        form = MensajeForm()
+    return render(request, 'store/contact.html', {'form': form})

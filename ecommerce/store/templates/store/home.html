@@ -1,56 +1,52 @@
 {% extends 'store/main.html' %}
-{% block title %}Inicio{% endblock title %}
+{% block title %}ThingStore | Innovación & Diseño{% endblock title %} {# Título actualizado #}
 {% load static %}
 {% block content %}
 
 {% block extra_css %}
 <link rel="stylesheet" type="text/css" href="{% static 'css/home.css' %}">
+{# Opcional: Fuentes de Google Fonts si las quieres usar para un toque más premium #}
+{# <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"> #}
 {% endblock extra_css %}
 
-<!-- Hero Section -->
-<div class="container" style="position: relative; z-index: 1;">
+<section class="hero-section text-center py-5">
+    <div class="container">
+        <h2 class="store-tagline mb-3">ThingStore</h2>
+        <h1 class="display-4 mb-3">Donde el Arte y la Tecnología Cobran Vida.</h1>
+        <p class="lead mb-4">Explora creaciones únicas, diseñadas con pasión y precisión, o encarga la tuya.</p>
+        <a href="{% url 'store' %}" class="btn btn-primary btn-lg btn-enter-store">Explora la Colección</a>
+    </div>
+</section>
 
-    <section class="text-center py-5 bg-dark text-light">
-        <div class="container">
-            <h2 class="store-name mb-3">ThingStore</h2>
-            <h1 class="display-4 mb-3">Arte y Tecnología para tu Hogar</h1>
-            <p class="lead mb-4">Decoración hecha a mano con precisión láser y diseño 3D. Explora productos únicos y descargables exclusivos.</p>
-            <a href="{% url 'store' %}" class="btn btn-primary btn-lg btn-enter-store">Visita Nuestra Tienda</a>
-        </div>
-    </section>
-
-    <!-- Características Destacadas -->
-    <section class="py-5 bg-secondary text-light">
-        <div class="container">
-            <div class="row text-center">
-                <div class="col-md-4 mb-4">
-                    <img src="{% static 'images/shield.svg' %}" alt="Calidad Artesanal" width="70" class="mb-3">
-                    <h5>Calidad Artesanal</h5>
-                    <p>Cada pieza es cuidadosamente elaborada a mano con atención al detalle.</p>
-                </div>
-                <div class="col-md-4 mb-4">
-                    <img src="{% static 'images/network.svg' %}" alt="Tecnología Avanzada" width="70" class="mb-3">
-                    <h5>Tecnología Avanzada</h5>
-                    <p>Utilizamos corte láser e impresión 3D para diseños innovadores y precisos.</p>
-                </div>
-                <div class="col-md-4 mb-4">
-                    <img src="{% static 'images/lock.svg' %}" alt="Productos Digitales" width="70" class="mb-3">
-                    <h5>Productos Digitales</h5>
-                    <p>Accede a diseños descargables para que puedas imprimir o cortar en casa.</p>
-                </div>
+<section class="value-proposition py-5">
+    <div class="container">
+        <div class="row text-center">
+            <div class="col-md-4 mb-4">
+                <img src="{% static 'images/shield.svg' %}" alt="Calidad Artesanal" width="70" class="mb-3 feature-icon">
+                <h5>Maestría Artesanal</h5>
+                <p>Cada pieza es elaborada a mano con una dedicación y atención al detalle inigualables.</p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <img src="{% static 'images/network.svg' %}" alt="Tecnología Avanzada" width="70" class="mb-3 feature-icon">
+                <h5>Innovación Vanguardista</h5>
+                <p>Fusionamos corte láser y diseño 3D para creaciones de precisión asombrosa.</p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <img src="{% static 'images/lock.svg' %}" alt="Diseño Exclusivo" width="70" class="mb-3 feature-icon">
+                <h5>Diseño Personalizado</h5>
+                <p>No encuentras lo que buscas? Creamos tu visión, pieza a pieza.</p>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <!-- Sección CTA -->
-    <section class="py-5 bg-primary text-white text-center">
-        <div class="container">
-            <h2 class="mb-3">Inspira tu espacio con creatividad y tecnología</h2>
-<!--            <a href="{% url 'store' %}" class="btn btn-light btn-lg btn-enter-store">Explorar Productos</a>-->
-        </div>
-    </section>
-
-</div>
+<section class="custom-creation-cta py-5 text-center">
+    <div class="container">
+        <h2 class="mb-3">¿Una Idea Única? Hagámosla Realidad.</h2>
+        <p class="lead mb-4">Estamos aquí para transformar tus conceptos en piezas excepcionales. Cuéntanos tu proyecto.</p>
+        <a href="{% url 'contact' %}" class="btn btn-primary btn-lg btn-contact">Mándanos un mensaje</a>
+    </div>
+</section>
 
 <script src="{% static 'js/home.js' %}"></script>
 

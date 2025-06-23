@@ -5,6 +5,7 @@ from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User  # Aunque get_user_model es preferible, se mantiene si ya lo usas.
 from .models import Customer  # Necesario para el ProfileEditForm
+from .models import Mensaje
 
 
 class CustomUserCreationForm(UserCreationForm):
@@ -93,3 +94,15 @@ class ProfileEditForm(forms.ModelForm):
                 self.customer_instance.save()
 
         return user
+
+
+class MensajeForm(forms.ModelForm):
+    class Meta:
+        model = Mensaje
+        fields = ['nombre', 'email', 'asunto', 'mensaje']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Tu Nombre'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Tu Correo Electrónico'}),
+            'asunto': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Asunto (Opcional)'}),
+            'mensaje': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Describe tu idea o consulta aquí...'}),
+        }

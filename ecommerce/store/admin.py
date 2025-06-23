@@ -1,8 +1,9 @@
 from django.contrib import admin
 from django.utils.html import format_html
 import json
-
 from .models import * # Asegúrate de que todos tus modelos están importados
+from django.utils import timezone # Importar para obtener la hora actual
+
 
 # Clase Admin para Category
 class CategoryAdmin(admin.ModelAdmin):
@@ -114,6 +115,50 @@ class ShippingAddressAdmin(admin.ModelAdmin):
     list_display = ('customer', 'address', 'city', 'state', 'zipcode', 'order')
     search_fields = ('customer__name', 'customer__email', 'address', 'city', 'zipcode')
     list_filter = ('state', 'city')
+
+
+
+
+@admin.register(Mensaje)
+class MensajeAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'email', 'asunto', 'fecha_envio', 'leido', 'fecha_lectura') # Añadir fecha_lectura
+    list_filter = ('leido', 'fecha_envio', 'fecha_lectura') # Filtrar también por fecha_lectura
+    search_fields = ('nombre', 'email', 'asunto', 'mensaje')
+    readonly_fields = ('fecha_envio',) # fecha_lectura NO será readonly para poderla actualizar
+
+    # Campo personalizado para mostrar en la vista de detalle del admin
+    fieldsets = (
+        (None, {
+            'fields': ('nombre', 'email', 'asunto', 'mensaje')
+        }),
+        ('Información del Mensaje', {
+            'fields': ('fecha_envio', 'leido', 'fecha_lectura') # Mostrar 'leido' y 'fecha_lectura'
+        }),
+    )
+
+    def save_model(self, request, obj, form, change):
+        # Si se marca como leído Y aún no tiene fecha_lectura o no estaba marcado como leído antes
+        if obj.leido and not obj.fecha_lectura:
+            obj.fecha_lectura = timezone.now() # Guarda la fecha y hora actuales
+        # Si se desmarca como leído, limpia la fecha_lectura (opcional, pero buena práctica)
+        elif not obj.leido and obj.fecha_lectura:
+            obj.fecha_lectura = None
+        super().save_model(request, obj, form, change)
+
+    # --- Acciones personalizadas actualizadas ---
+    def marcar_como_leido(self, request, queryset):
+        for mensaje in queryset:
+            if not mensaje.leido: # Solo actualiza si no estaba ya leído
+                mensaje.leido = True
+                mensaje.fecha_lectura = timezone.now()
+                mensaje.save() # Guardar cada objeto individualmente
+        self.message_user(request, "Los mensajes seleccionados han sido marcados como leídos y su fecha de lectura actualizada.")
+    marcar_como_leido.short_description = "Marcar mensajes seleccionados como leídos"
+
+    def marcar_como_no_leido(self, request, queryset):
+        queryset.update(leido=False, fecha_lectura=None) # Al desmarcar, también limpia la fecha de lectura
+        self.message_user(request, "Los mensajes seleccionados han sido marcados como NO leídos y su fecha de lectura eliminada.")
+    marcar_como_no_leido.short_description = "Marcar mensajes seleccionados como NO leídos"
 
 # --- REGISTROS DE MODELOS CON SUS CLASES ADMIN PERSONALIZADAS ---
 admin.site.register(Customer, CustomerAdmin)

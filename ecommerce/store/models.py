@@ -162,3 +162,24 @@ class ShippingAddress(models.Model):
 
     def __str__(self):
         return self.address
+
+# store/models.py (o contact/models.py si creas una nueva app)
+
+from django.db import models
+
+class Mensaje(models.Model):
+    nombre = models.CharField(max_length=100)
+    email = models.EmailField()
+    asunto = models.CharField(max_length=200, blank=True, null=True)
+    mensaje = models.TextField()
+    fecha_envio = models.DateTimeField(auto_now_add=True)
+    leido = models.BooleanField(default=False) # Para saber si ya lo has revisado
+    fecha_lectura = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Mensaje de Contacto"
+        verbose_name_plural = "Mensajes de Contacto"
+        ordering = ['-fecha_envio'] # Ordenar por los más recientes primero
+
+    def __str__(self):
+        return f"Mensaje de {self.nombre} ({self.email}) - Asunto: {self.asunto if self.asunto else 'N/A'}"
