@@ -2,8 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid # ¡Importa uuid para generar tokens únicos!
 from decimal import Decimal
-
 from django.urls import reverse
+from django.utils.text import slugify
 
 
 # Create your models here.
@@ -17,7 +17,6 @@ class Customer(models.Model):
         return self.name if self.name else 'Cliente Anónimo' # Mejorar representación si name es None
 
 
-# --- NUEVOS MODELOS: Category y SubCategory ---
 class Category(models.Model):
     name = models.CharField(max_length=200, unique=True, verbose_name="Nombre de Categoría")
     slug = models.SlugField(max_length=200, unique=True, verbose_name="Slug (para URL)")
@@ -54,18 +53,73 @@ class SubCategory(models.Model):
         return reverse('products_by_subcategory', args=[self.category.slug, self.slug])
 
 
+
 class Product(models.Model):
     name = models.CharField(max_length=200)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # --- NUEVO CAMPO SLUG ---
+    # Un slug debe ser único para evitar URLs duplicadas
+    # y permitir su uso en URLs amigables.
+    slug = models.SlugField(unique=True, max_length=200, null=True, blank=True)
+    # ------------------------
+
+    description = models.TextField(null=True, blank=True, help_text="Descripción corta del producto.")
+    long_description = models.TextField(null=True, blank=True,
+                                        help_text="Descripción detallada y características del producto.")
+    # Puedes añadir un campo para SKU, peso, dimensiones, etc. si lo necesitas
+    # sku = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    # stock = models.IntegerField(default=0, help_text="Cantidad de unidades en stock")
+    # ---------------------
+
     digital = models.BooleanField(default=False, null=True, blank=True)
     image = models.ImageField(null=True, blank=True, upload_to='product_images/')
     digital_file = models.FileField(upload_to='digital_products/', null=True, blank=True)
 
-    # Añadir campo de subcategoría al producto
-    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Subcategoría")
+    subcategory = models.ForeignKey(SubCategory, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='products', verbose_name="Subcategoría")
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        # Genera el slug automáticamente desde el nombre si no se proporciona.
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    @property
+    def imageURL(self):
+        try:
+            url = self.image.url
+        except ValueError:  # Changed from 'except' to 'except ValueError' for more specific error handling
+            url = ''
+        return url
+
+    @property
+    def has_digital_file(self):
+        return self.digital and bool(self.digital_file)
+
+    class Meta:
+        verbose_name = "Producto"
+        verbose_name_plural = "Productos"
+        ordering = ['name']  # Puedes ordenar como prefieras
+
+# --- NUEVO MODELO PARA IMÁGENES ADICIONALES ---
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='additional_images')
+    image = models.ImageField(upload_to='product_additional_images/')
+    alt_text = models.CharField(max_length=255, blank=True,
+                                help_text="Texto alternativo para la imagen (SEO y accesibilidad)")
+    order = models.IntegerField(default=0, help_text="Orden de visualización de la imagen")
+
+    class Meta:
+        verbose_name = "Imagen de Producto Adicional"
+        verbose_name_plural = "Imágenes de Productos Adicionales"
+        ordering = ['order']
+
+    def __str__(self):
+        return f"Imagen de {self.product.name} ({self.order})"
 
     @property
     def imageURL(self):
@@ -74,10 +128,6 @@ class Product(models.Model):
         except ValueError:
             url = ''
         return url
-
-    @property
-    def has_digital_file(self):
-        return self.digital and bool(self.digital_file)
 
 
 class Order(models.Model):
@@ -183,3 +233,30 @@ class Mensaje(models.Model):
 
     def __str__(self):
         return f"Mensaje de {self.nombre} ({self.email}) - Asunto: {self.asunto if self.asunto else 'N/A'}"
+
+
+
+class Promocion(models.Model):
+    titulo = models.CharField(max_length=100, help_text="Título breve de la promoción (ej. 'Envío Gratis')")
+    mensaje = models.TextField(help_text="Descripción detallada de la promoción (ej. 'En todos los pedidos superiores a 50€')")
+    imagen = models.ImageField(upload_to='promociones/', blank=True, null=True, help_text="Imagen opcional para la promoción")
+    url_destino = models.URLField(blank=True, null=True, help_text="URL a donde redirigir al hacer clic en la promoción (ej. /store/ofertas-especiales/)")
+    activa = models.BooleanField(default=True, help_text="Marca si esta promoción debe mostrarse en la tienda")
+    fecha_inicio = models.DateField(null=True, blank=True, help_text="Fecha de inicio de la promoción (opcional)")
+    fecha_fin = models.DateField(null=True, blank=True, help_text="Fecha de fin de la promoción (opcional)")
+
+    class Meta:
+        verbose_name = "Promoción"
+        verbose_name_plural = "Promociones"
+        ordering = ['-fecha_inicio', 'titulo'] # Ordenar por fecha de inicio descendente
+
+    def __str__(self):
+        return self.titulo
+
+    @property
+    def imageURL(self):
+        try:
+            url = self.imagen.url
+        except:
+            url = ''
+        return url

@@ -20,4 +20,5 @@ urlpatterns = [
     # Ruta para productos por subcategoría: /store/electronica/smartphones/
     path('category/<slug:category_slug>/<slug:subcategory_slug>/', views.store, name='products_by_subcategory'),
     path('contact/', views.contact_view, name='contact'), # Nueva URL de contacto
+    path('product/<slug:product_slug>/', views.product_detail, name="product_detail"),
 ]

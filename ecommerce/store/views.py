@@ -14,13 +14,14 @@ from wsgiref.util import FileWrapper
 from decimal import Decimal
 from .forms import CustomUserCreationForm, ProfileEditForm, MensajeForm
 from .models import Customer, Product, Order, OrderItem, ShippingAddress, Category, \
-    SubCategory  # Importar Category y SubCategory
+    SubCategory, Promocion  # Importar Category y SubCategory
 from .utils import cookieCart, cartData, guestOrder
 from django.contrib.auth import login
 import re
 from django.utils import timezone
-
-
+from datetime import date
+from django.db.models import Q
+import random
 
 
 # --- VISTAS GENERALES DE LA TIENDA ---
@@ -29,44 +30,62 @@ def home(request):
     return render(request, 'store/home.html')
 
 
-# Modificamos la vista 'store' para que acepte slugs de categoría y subcategoría
 def store(request, category_slug=None, subcategory_slug=None):
     data = cartData(request)
     cartItems = data['cartItems']
     order = data['order']
 
-    products = Product.objects.all()  # Empezamos con todos los productos
+    all_products_query = Product.objects.all()  # Consulta inicial de todos los productos
     selected_category = None
     selected_subcategory = None
 
-    # Filtrar por subcategoría si se proporciona un subcategory_slug
+    # Filtrar por subcategoría o categoría
     if subcategory_slug:
         selected_subcategory = get_object_or_404(SubCategory, slug=subcategory_slug)
-        products = products.filter(subcategory=selected_subcategory)
-        selected_category = selected_subcategory.category  # Asegurarse de tener también la categoría principal
-    # Si no hay subcategoría, pero sí categoría, filtrar por categoría
+        all_products_query = all_products_query.filter(subcategory=selected_subcategory)
+        selected_category = selected_subcategory.category
     elif category_slug:
         selected_category = get_object_or_404(Category, slug=category_slug)
-        # Filtra productos cuyas subcategorías pertenezcan a la categoría seleccionada
-        products = products.filter(subcategory__category=selected_category)
+        all_products_query = all_products_query.filter(subcategory__category=selected_category)
+
+    # --- Lógica para seleccionar hasta 12 productos aleatorios ---
+    # Convertimos el QuerySet a una lista para poder usar random.sample
+    # OJO: Si tienes CIENTOS de miles de productos, .all() puede ser lento.
+    # Para ese caso, habría que pensar en una estrategia de "OFFSET/LIMIT" con orden aleatorio de base de datos.
+    all_available_products = list(all_products_query)
+
+    # Seleccionamos hasta 12 productos aleatorios
+    if len(all_available_products) > 12:
+        products_to_display = random.sample(all_available_products, 12)
+    else:
+        products_to_display = all_available_products  # Si hay menos de 12, mostramos todos
 
     # Obtener todas las categorías y subcategorías para la navegación
     categories = Category.objects.all().order_by('name')
-    # Para mostrar subcategorías solo de la categoría seleccionada si aplica
     subcategories = []
     if selected_category:
         subcategories = selected_category.subcategories.all().order_by('name')
 
+    # Lógica para obtener promociones activas
+    today = date.today()
+    promotions = Promocion.objects.filter(
+        activa=True
+    ).filter(
+        Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=today)
+    ).filter(
+        Q(fecha_inicio__isnull=True) | Q(fecha_inicio__lte=today)
+    ).order_by('-fecha_inicio')
+
     context = {
-        'products': products,
+        'products': products_to_display,  # <--- ¡Ahora pasamos esta nueva lista!
         'cartItems': cartItems,
-        'selected_category': selected_category,  # Para resaltar la categoría activa en la plantilla
-        'selected_subcategory': selected_subcategory,  # Para resaltar la subcategoría activa
-        'categories': categories,  # Todas las categorías para la navegación principal
-        'subcategories': subcategories,  # Subcategorías de la categoría seleccionada (o vacía)
+        'selected_category': selected_category,
+        'selected_subcategory': selected_subcategory,
+        'categories': categories,
+        'subcategories': subcategories,
+        'promotions': promotions,
     }
     return render(request, 'store/store.html', context)
-
 
 def cart(request):
     data = cartData(request)
@@ -456,3 +475,36 @@ def contact_view(request):
     else:
         form = MensajeForm()
     return render(request, 'store/contact.html', {'form': form})
+
+
+
+def product_detail(request, product_slug):
+    data = cartData(request)  # Asumo que cartData() es una función de utilidad global o importada
+    cartItems = data['cartItems']
+
+    # Obtener el producto usando el slug. Si no se encuentra, devolver 404.
+    product = get_object_or_404(Product, slug=product_slug)
+
+    # Obtener las imágenes adicionales relacionadas con este producto
+    # Django automáticamente crea un manager para related_name='additional_images'
+    additional_images = product.additional_images.all().order_by('order')
+
+    # Si hay una imagen principal, la incluimos en la lista para mostrarla primero
+    all_product_images = []
+    if product.image:
+        all_product_images.append(product.image)
+
+    # Añadimos las imágenes adicionales
+    for img_obj in additional_images:
+        all_product_images.append(img_obj.image)  # Accedemos al campo ImageField
+
+    # Puedes añadir lógica para "productos relacionados" aquí si lo deseas
+    # related_products = Product.objects.filter(subcategory=product.subcategory).exclude(id=product.id)[:4]
+
+    context = {
+        'product': product,
+        'cartItems': cartItems,
+        'all_product_images': all_product_images,  # Pasamos todas las URLs de imagen
+        # 'related_products': related_products, # Si implementas productos relacionados
+    }
+    return render(request, 'store/product_detail.html', context)

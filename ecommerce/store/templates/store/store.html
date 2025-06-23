@@ -35,6 +35,29 @@
                     {% endfor %}
                 </ul>
             </div>
+
+            {# --- NUEVA SECCIÓN DE PROMOCIONES --- #}
+            {% if promotions %}
+                <div class="box-element p-3 mb-4 promotion-section">
+                    <h4 class="mb-3">Promociones Especiales</h4>
+                    {% for promo in promotions %}
+                        <div class="promotion-card mb-3">
+                            {% if promo.imageURL %}
+                                <a href="{{ promo.url_destino|default:'#' }}" {% if promo.url_destino %}target="_blank"{% endif %}>
+                                    <img src="{{ promo.imageURL }}" alt="{{ promo.titulo }}" class="img-fluid mb-2">
+                                </a>
+                            {% endif %}
+                            <h5 class="promo-title">{{ promo.titulo }}</h5>
+                            <p class="promo-message">{{ promo.mensaje }}</p>
+                            {% if promo.url_destino %}
+                                <a href="{{ promo.url_destino }}" class="btn btn-sm btn-primary promo-btn" {% if promo.url_destino %}target="_blank"{% endif %}>Ver Oferta</a>
+                            {% endif %}
+                        </div>
+                        {% if not forloop.last %}<hr class="my-3">{% endif %} {# Separador entre promos #}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {# ------------------------------------- #}
         </div>
 
         {# Contenido principal para productos #}
@@ -43,9 +66,13 @@
                 {% for product in products %}
                     <div class="col-lg-3 col-md-6 col-sm-6 mb-4">
                         <div class="box-element product-item">
-                            <img class="thumbnail" src="{{ product.imageURL }}">
+                            {# Enlaza la imagen a la página de detalle del producto #}
+                            <a href="{% url 'product_detail' product.slug %}">
+                                <img class="thumbnail" src="{{ product.imageURL }}">
+                            </a>
                             <div class="product-info">
-                                <h6><strong>{{ product.name }}</strong></h6>
+                                {# Enlaza el nombre del producto a la página de detalle #}
+                                <h6><strong><a href="{% url 'product_detail' product.slug %}" class="text-dark">{{ product.name }}</a></strong></h6>
                                 <hr>
                                 <h4 style="display: inline-block; float: right"><strong>€ {{ product.price|floatformat:2 }}</strong></h4>
                                 <button data-product="{{ product.id }}" data-action="add" class="btn btn-outline-secondary add-btn update-cart">Añadir al Carrito</button>

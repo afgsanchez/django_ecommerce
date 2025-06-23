@@ -1,0 +1,126 @@
+{% extends 'store/main.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'store' %}">Tienda</a></li>
+            {% if product.subcategory %}
+                <li class="breadcrumb-item"><a href="{% url 'products_by_category' product.subcategory.category.slug %}">{{ product.subcategory.category.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'products_by_subcategory' product.subcategory.category.slug product.subcategory.slug %}">{{ product.subcategory.name }}</a></li>
+            {% elif product.category %}
+                <li class="breadcrumb-item"><a href="{% url 'products_by_category' product.category.slug %}">{{ product.category.name }}</a></li>
+            {% endif %}
+            <li class="breadcrumb-item active" aria-current="page">{{ product.name }}</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row mt-4">
+    <div class="col-lg-6">
+        <div id="productCarousel" class="carousel slide" data-ride="carousel"> {# CAMBIO: data-ride #}
+            <div class="carousel-inner">
+                {% for image_url in all_product_images %}
+                <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                    {# Asumiendo que image_url es un objeto ImageFieldFile y tiene un .url #}
+                    <img src="{{ image_url.url }}" class="d-block w-100 product-detail-img" alt="{{ product.name }}">
+                </div>
+                {% empty %}
+                <div class="carousel-item active">
+                    <img src="{% static 'images/placeholder.png' %}" class="d-block w-100 product-detail-img" alt="Imagen no disponible">
+                </div>
+                {% endfor %}
+            </div>
+            {% if all_product_images|length > 1 %}
+            {# Controles del carrusel (Adaptados para Bootstrap 4.4.1) #}
+            <a class="carousel-control-prev" href="#productCarousel" role="button" data-slide="prev"> {# CAMBIO: a tag, href, data-slide #}
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="sr-only">Anterior</span> {# CAMBIO: sr-only #}
+            </a>
+            <a class="carousel-control-next" href="#productCarousel" role="button" data-slide="next"> {# CAMBIO: a tag, href, data-slide #}
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="sr-only">Siguiente</span> {# CAMBIO: sr-only #}
+            </a>
+            {% endif %}
+        </div>
+        <div class="row mt-2">
+            {% for image_url in all_product_images %}
+            <div class="col-3 col-md-2 mb-2">
+                {# CAMBIO: data-target y data-slide-to #}
+                <img src="{{ image_url.url }}" class="img-fluid border thumbnail-img" alt="{{ product.name }}" data-target="#productCarousel" data-slide-to="{{ forloop.counter0 }}">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="box">
+            <h3>{{ product.name }}</h3>
+            <hr>
+            <h4 class="price">{{ product.price|floatformat:2 }}€</h4>
+            <hr>
+
+            {% if product.description %}
+            <p><strong>Descripción:</strong> {{ product.description }}</p>
+            <hr>
+            {% endif %}
+
+            <button data-product="{{ product.id }}" data-action="add" class="btn btn-outline-success add-btn update-cart">Añadir al Carrito</button>
+
+            {% if product.digital %}
+            <span class="badge bg-info ms-2">Producto Digital</span>
+            {% endif %}
+            <hr>
+
+            {% if product.long_description %}
+            <h5>Detalles y Características:</h5>
+            <p>{{ product.long_description|linebreaksbr }}</p>
+            {% else %}
+            <p>No hay detalles adicionales disponibles para este producto.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# Sección de productos relacionados (opcional) - Comentada como antes #}
+{% comment %}
+{% if related_products %}
+<div class="row mt-5">
+    <div class="col-12">
+        <h3>Productos Relacionados</h3>
+        <hr>
+    </div>
+    {% for related_product in related_products %}
+    <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+        <div class="box product-item">
+            <a href="{% url 'product_detail' related_product.slug %}">
+                <img class="thumbnail" src="{{ related_product.imageURL }}">
+            </a>
+            <div class="product-info">
+                <h6><strong>{{ related_product.name }}</strong></h6>
+                <h4 style="display: inline-block; float: right">{{ related_product.price|floatformat:2 }}€</h4>
+                <a class="btn btn-outline-dark mt-2 add-btn" href="{% url 'product_detail' related_product.slug %}">Ver</a>
+                <button data-product="{{ related_product.id }}" data-action="add" class="btn btn-outline-success mt-2 update-cart">Añadir al Carrito</button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endcomment %}
+
+{% endblock content %}
+
+{# SCRIPT ADICIONAL PARA LAS MINIATURAS DEL BOOTSTRAP 4 #}
+{% block extra_js %}
+<script>
+    // Script para que las miniaturas funcionen con el carrusel de Bootstrap 4
+    $(document).ready(function() {
+        $('.thumbnail-img').on('click', function(){
+            var slideTo = $(this).data('slide-to');
+            $('#productCarousel').carousel(slideTo);
+        });
+    });
+</script>
+{% endblock extra_js %}

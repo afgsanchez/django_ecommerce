@@ -18,13 +18,58 @@ class SubCategoryAdmin(admin.ModelAdmin):
     list_filter = ('category',) # Permite filtrar por la categoría principal
     search_fields = ('name', 'category__name') # Buscar por nombre de subcategoría y nombre de categoría
 
-# Modificación de ProductAdmin para incluir la subcategoría
+
+# --- INLINE PARA LAS IMÁGENES ADICIONALES ---
+# Esto permite añadir y gestionar las imágenes de un producto directamente
+# desde la página de edición de ese producto en el admin.
+class ProductImageInline(admin.TabularInline):  # Puedes usar admin.StackedInline para un diseño vertical
+    model = ProductImage
+    extra = 1  # Cuántos formularios vacíos adicionales se muestran para añadir nuevas imágenes
+    fields = ['image', 'alt_text', 'order']  # Campos a mostrar para cada imagen
+    # Opcional: Si quieres un campo de solo lectura para la URL de la imagen
+    # readonly_fields = ['image_preview']
+    # def image_preview(self, obj):
+    #     if obj.image:
+    #         from django.utils.html import format_html
+    #         return format_html('<img src="{}" style="max-height: 80px;"/>', obj.image.url)
+    #     return "No Image"
+    # image_preview.short_description = "Previsualización"
+
+
+# --- REGISTRO DEL MODELO PRODUCT ---
+@admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price', 'digital', 'subcategory', 'has_digital_file') # Añadido 'subcategory'
-    list_filter = ('digital', 'subcategory__category', 'subcategory') # Filtros por tipo y categoría/subcategoría
-    search_fields = ('name', 'subcategory__name', 'subcategory__category__name') # Búsqueda mejorada
-    # Añade 'subcategory' a los campos editables si no lo tienes ya en un fieldset
-    fields = ('name', 'price', 'digital', 'image', 'digital_file', 'subcategory')
+    # Campos que se muestran en la tabla de lista de productos en el admin
+    list_display = ('name', 'price', 'digital', 'subcategory', 'imageURL', 'has_digital_file')
+
+    # Filtros laterales en la lista de productos
+    list_filter = ('digital', 'subcategory__category', 'subcategory')
+
+    # Campos por los que se puede buscar en la barra de búsqueda del admin
+    search_fields = ('name', 'description', 'long_description', 'subcategory__name', 'subcategory__category__name')
+
+    # Definición de las secciones y campos en el formulario de edición de un producto
+    fieldsets = (
+        (None, {  # Sección principal, sin título
+            'fields': ('name', 'price', 'subcategory', 'digital', 'image')
+        }),
+        ('Descripción y Detalles', {  # Nueva sección para las descripciones
+            'fields': ('description', 'long_description'),
+            'description': 'Información detallada para la página del producto y listados.'
+        }),
+        ('Archivos Digitales', {  # Sección para productos digitales
+            'fields': ('digital_file',),
+            'classes': ('collapse',),  # Esto hace que la sección sea colapsable por defecto
+            'description': 'Configura el archivo descargable si el producto es digital.'
+        }),
+        # Puedes añadir más secciones aquí si incluyes campos como 'stock', 'sku', etc.
+    )
+
+    # Conecta el inline de ProductImage al ProductAdmin
+    inlines = [ProductImageInline]
+
+    # Orden por defecto en la lista de productos (opcional, si no está en Meta del modelo)
+    # ordering = ['name']
 
 
 # Definir el inline para OrderItem (ya lo tenías)
@@ -160,9 +205,25 @@ class MensajeAdmin(admin.ModelAdmin):
         self.message_user(request, "Los mensajes seleccionados han sido marcados como NO leídos y su fecha de lectura eliminada.")
     marcar_como_no_leido.short_description = "Marcar mensajes seleccionados como NO leídos"
 
+
+@admin.register(Promocion)
+class PromocionAdmin(admin.ModelAdmin):
+    list_display = ('titulo', 'activa', 'fecha_inicio', 'fecha_fin', 'url_destino')
+    list_filter = ('activa', 'fecha_inicio', 'fecha_fin')
+    search_fields = ('titulo', 'mensaje')
+    fieldsets = (
+        (None, {
+            'fields': ('titulo', 'mensaje', 'activa', 'imagen', 'url_destino')
+        }),
+        ('Fechas de Vigencia', {
+            'fields': ('fecha_inicio', 'fecha_fin'),
+            'classes': ('collapse',), # Esto colapsa la sección por defecto
+        }),
+    )
+
 # --- REGISTROS DE MODELOS CON SUS CLASES ADMIN PERSONALIZADAS ---
 admin.site.register(Customer, CustomerAdmin)
-admin.site.register(Product, ProductAdmin) # ¡REGISTRAR Product con ProductAdmin modificado!
+#admin.site.register(Product, ProductAdmin) # ¡REGISTRAR Product con ProductAdmin modificado!
 admin.site.register(Order, OrderAdmin)
 admin.site.register(OrderItem, OrderItemAdmin)
 admin.site.register(ShippingAddress, ShippingAddressAdmin)
