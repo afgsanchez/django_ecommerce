@@ -1,0 +1,90 @@
+/* Home - Cybersecurity Style */
+
+.hero-section {
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    color: #00fff7;
+    font-family: 'Roboto Mono', monospace;
+}
+
+.hero-title {
+    font-size: 3rem;
+    font-weight: 700;
+    text-shadow: 0 0 8px #00fff7;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    margin-bottom: 2rem;
+    color: #a0f0f5;
+    text-shadow: 0 0 4px #00fff7;
+}
+
+.btn-neon {
+    background-color: transparent;
+    border: 2px solid #00fff7;
+    color: #00fff7;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    border-radius: 30px;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px #00fff7;
+}
+
+.btn-neon:hover {
+    background-color: #00fff7;
+    color: #203a43;
+    box-shadow: 0 0 20px #00fff7;
+}
+
+.features-section {
+    background-color: #121f2e;
+    color: #c0eefd;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.feature-icon {
+    filter: drop-shadow(0 0 3px #00fff7);
+}
+
+.feature-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 1rem;
+    text-shadow: 0 0 4px #00fff7;
+}
+
+.feature-text {
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    color: #a0f0f5;
+}
+
+.cta-section {
+    background: #0f2027;
+    color: #00fff7;
+    font-family: 'Roboto Mono', monospace;
+    text-shadow: 0 0 6px #00fff7;
+}
+
+.cta-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.btn-outline-neon {
+    background-color: transparent;
+    border: 2px solid #00fff7;
+    color: #00fff7;
+    padding: 0.75rem 2.5rem;
+    border-radius: 30px;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 10px #00fff7;
+}
+
+.btn-outline-neon:hover {
+    background-color: #00fff7;
+    color: #0f2027;
+    box-shadow: 0 0 25px #00fff7;
+}

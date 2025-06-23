@@ -8,6 +8,7 @@
 
     {# Bootstrap CSS (mantener para componentes existentes) #}
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" xintegrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
 
     {# Tu CSS personalizado (main.css) #}
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
@@ -15,121 +16,8 @@
     <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     {# Font Awesome (para iconos) #}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" crossorigin="anonymous" />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display&display=swap" rel="stylesheet">
 
-    {# Estilos básicos para elementos que no están en Bootstrap directamente #}
-    <style>
-        body {
-            font-family: sans-serif; /* Usar la fuente por defecto del sistema */
-            background-color: #f8f9fa; /* Color de fondo claro de Bootstrap */
-            color: #212529; /* Texto oscuro de Bootstrap */
-        }
-        .box-element {
-            background-color: #ffffff;
-            padding: 15px;
-            border-radius: 8px; /* Bordes más suaves */
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Sombra suave */
-            margin-bottom: 20px;
-        }
-        .navbar-brand {
-            font-weight: 700;
-        }
-        .product-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            border: 1px solid #dee2e6; /* Borde de Bootstrap */
-            padding: 15px;
-            border-radius: 8px;
-            height: 100%;
-            justify-content: space-between;
-        }
-        .product-item .thumbnail {
-            max-width: 100%;
-            height: auto;
-            object-fit: contain; /* Asegura que la imagen no se recorte ni deforme */
-            border-radius: 5px;
-            margin-bottom: 15px;
-        }
-        .product-item .product-info {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            flex-grow: 1;
-            padding-bottom: 5px;
-        }
-        .product-item h6 {
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        .product-item h4 {
-            font-weight: 700;
-            color: #28a745; /* Verde de éxito de Bootstrap */
-            margin-top: 5px;
-            margin-bottom: 10px;
-        }
-        .product-item .add-btn {
-            width: 100%;
-            margin-top: auto;
-        }
-        #cart-icon {
-            width: 30px;
-            height: 30px;
-            display: inline-block;
-            vertical-align: middle;
-            margin-left: 10px;
-        }
-        #cart-total {
-            background-color: #ffc107; /* Amarillo de Bootstrap */
-            color: #212529; /* Texto oscuro */
-            padding: 5px 10px;
-            border-radius: 50%;
-            font-size: 14px;
-            position: relative;
-            top: -10px;
-            left: -5px;
-            display: inline-block;
-            vertical-align: middle;
-            line-height: 1;
-            font-weight: bold;
-        }
-        /* Estilos para el menú desplegable de categorías */
-        .dropdown-header-custom {
-            display: block;
-            padding: .5rem 1.5rem;
-            margin-bottom: 0;
-            font-size: .875rem;
-            color: #6c757d; /* Texto gris de Bootstrap */
-            white-space: nowrap;
-            font-weight: bold;
-        }
-        .dropdown-header-custom > a {
-            color: inherit; /* Hereda el color */
-            text-decoration: none;
-        }
-        .dropdown-header-custom > a:hover {
-            text-decoration: underline;
-        }
-        .dropdown-item-indent {
-            padding-left: 2.5rem !important; /* Sangría para subcategorías */
-        }
-        /* Color para la categoría/subcategoría activa en el menú */
-        .dropdown-item.active-category, .dropdown-item.active-subcategory {
-            background-color: #007bff !important; /* Azul primario de Bootstrap */
-            color: #fff !important;
-        }
-        .dropdown-header-active {
-            color: #007bff !important; /* Azul primario de Bootstrap */
-        }
-
-        /* Ajuste para margen lateral reducido en el contenedor principal */
-        .container {
-            max-width: 90% !important;
-            padding-left: 30px;
-            padding-right: 30px;
-        }
-    </style>
 
     <script type="text/javascript">
        var user = '{{request.user}}'
@@ -175,7 +63,7 @@
 <body>
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <a class="navbar-brand" href="{% url 'store' %}">ThingStore</a>
+      <a class="navbar-brand" href="{% url 'home' %}">ThingStore</a>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -183,7 +71,7 @@
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
           <li class="nav-item {% if not selected_category_obj and not selected_subcategory_obj %}active{% endif %}">
-            <a class="nav-link" href="{% url 'store' %}">Home <span class="sr-only">(current)</span></a>
+            <a class="nav-link" href="{% url 'store' %}">Tienda <span class="sr-only">(current)</span></a>
           </li>
         </ul>
           <div class="form-inline my-2 my-lg-0">

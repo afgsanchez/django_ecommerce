@@ -1,0 +1,215 @@
+/* home.css - estilo techy/futurista */
+
+body, html {
+  background-color: #0d1117; /* casi negro azulado */
+  color: #c9d1d9; /* gris claro, texto legible */
+  font-family: 'Orbitron', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+section {
+  padding: 60px 0;
+}
+
+.bg-dark {
+  background-color: #161b22 !important;
+  color: #8b949e !important;
+}
+
+.bg-secondary {
+  background-color: #21262d !important;
+  color: #8b949e !important;
+}
+
+.bg-primary {
+  background-color: #0ff !important; /* cyan neón */
+  color: #0d1117 !important;
+}
+
+.text-light {
+  color: #c9d1d9 !important;
+}
+
+.text-white {
+  color: #f0f6fc !important;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.container {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding-left: 15px;
+  padding-right: 15px;
+}
+
+.display-4 {
+  font-weight: 700;
+  font-size: 3rem;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+  color: #00f6ff; /* cyan neón */
+  text-shadow: 0 0 8px #00f6ff;
+  letter-spacing: 0.05em;
+}
+
+.lead {
+  font-size: 1.3rem;
+  font-weight: 400;
+  margin-bottom: 2rem;
+  color: #58a6ff; /* azul claro */
+  text-shadow: 0 0 3px #58a6ff;
+}
+
+h5 {
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #39ff14; /* verde neón */
+  text-shadow: 0 0 6px #39ff14;
+  letter-spacing: 0.05em;
+}
+
+p {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #8b949e;
+}
+
+.btn-primary {
+  background-color: transparent;
+  border: 2px solid #00fff7;
+  color: #00fff7;
+  padding: 12px 30px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px #00fff7;
+}
+
+.btn-primary:hover {
+  background-color: #00fff7;
+  color: #0d1117;
+  box-shadow: 0 0 20px #00fff7;
+  text-decoration: none;
+}
+
+.btn-light {
+  background-color: transparent;
+  border: 2px solid #39ff14;
+  color: #39ff14;
+  padding: 12px 30px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 0 10px #39ff14;
+  transition: all 0.3s ease;
+}
+
+.btn-light:hover {
+  background-color: #39ff14;
+  color: #0d1117;
+  box-shadow: 0 0 20px #39ff14;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 6px #00fff7);
+  border-radius: 8px;
+}
+
+.mb-3 {
+  margin-bottom: 1rem !important;
+}
+
+.mb-4 {
+  margin-bottom: 1.5rem !important;
+}
+
+.py-5 {
+  padding-top: 3rem !important;
+  padding-bottom: 3rem !important;
+}
+
+@keyframes neonGlow {
+  0%, 100% {
+    text-shadow:
+      0 0 5px #00f6ff,
+      0 0 10px #00f6ff,
+      0 0 20px #00f6ff,
+      0 0 40px #00f6ff,
+      0 0 80px #00f6ff;
+  }
+  50% {
+    text-shadow:
+      0 0 10px #00f6ff,
+      0 0 20px #00f6ff,
+      0 0 30px #00f6ff,
+      0 0 50px #00f6ff,
+      0 0 90px #00f6ff;
+  }
+}
+
+@keyframes buttonPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px #00fff7;
+  }
+  50% {
+    box-shadow: 0 0 25px #00fff7;
+  }
+}
+
+/* Aplicar a títulos */
+.display-4 {
+  animation: neonGlow 3s ease-in-out infinite;
+}
+
+/* Aplicar a botones */
+.btn-primary, .btn-light {
+  animation: buttonPulse 4s ease-in-out infinite;
+}
+
+@keyframes slideLines {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to right,
+    rgba(0, 255, 255, 0.05) 0,
+    rgba(0, 255, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 20px
+  );
+  animation: slideLines 20s linear infinite;
+  z-index: 0;
+}
+
+.store-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 3rem;
+    font-weight: 700;
+    color: #00ffff; /* tono cyan tech */
+    letter-spacing: 3px;
+
+    margin-bottom: 0.5rem;
+    text-shadow: 0 0 10px #00ffff88;
+}

@@ -23,6 +23,10 @@ from django.utils import timezone
 
 # --- VISTAS GENERALES DE LA TIENDA ---
 
+def home(request):
+    return render(request, 'store/home.html')
+
+
 # Modificamos la vista 'store' para que acepte slugs de categoría y subcategoría
 def store(request, category_slug=None, subcategory_slug=None):
     data = cartData(request)
