@@ -479,32 +479,32 @@ def contact_view(request):
 
 
 def product_detail(request, product_slug):
-    data = cartData(request)  # Asumo que cartData() es una función de utilidad global o importada
+    data = cartData(request)  # Función que asumo tienes para el carrito
     cartItems = data['cartItems']
 
-    # Obtener el producto usando el slug. Si no se encuentra, devolver 404.
+    # Obtener el producto o 404
     product = get_object_or_404(Product, slug=product_slug)
 
-    # Obtener las imágenes adicionales relacionadas con este producto
-    # Django automáticamente crea un manager para related_name='additional_images'
+    # Imágenes principales y adicionales
     additional_images = product.additional_images.all().order_by('order')
-
-    # Si hay una imagen principal, la incluimos en la lista para mostrarla primero
     all_product_images = []
     if product.image:
         all_product_images.append(product.image)
-
-    # Añadimos las imágenes adicionales
     for img_obj in additional_images:
-        all_product_images.append(img_obj.image)  # Accedemos al campo ImageField
+        all_product_images.append(img_obj.image)
 
-    # Puedes añadir lógica para "productos relacionados" aquí si lo deseas
-    # related_products = Product.objects.filter(subcategory=product.subcategory).exclude(id=product.id)[:4]
+    # Productos relacionados: por subcategoría o categoría, excluyendo el producto actual
+    if product.subcategory:
+        related_products = Product.objects.filter(subcategory=product.subcategory).exclude(id=product.id)[:4]
+    elif product.category:
+        related_products = Product.objects.filter(category=product.category).exclude(id=product.id)[:4]
+    else:
+        related_products = Product.objects.none()  # Si no hay categoría ni subcategoría
 
     context = {
         'product': product,
         'cartItems': cartItems,
-        'all_product_images': all_product_images,  # Pasamos todas las URLs de imagen
-        # 'related_products': related_products, # Si implementas productos relacionados
+        'all_product_images': all_product_images,
+        'related_products': related_products,
     }
     return render(request, 'store/product_detail.html', context)
